@@ -1,3 +1,4 @@
 fastapi
 uvicorn
 SQLAlchemy>=2.0,<3.0
+python-dotenv
