@@ -53,6 +53,14 @@ The database stores metadata and workflow records only; backup file contents are
 
 ## Current scope
 
+### Teammate components brought into this working tree
+
+The Wazuh detector now delivers authenticated normalized events to `POST /api/internal/security-events`; that ingestion path runs the `app.risk_engine` threat rules, stores a policy-classified risk assessment, and invokes the `app.decision` engine to create a recommendation-only decision. Event processing failures remain persisted as `normalized` and are audited; redelivery can retry the pipeline. The API continues to enforce asset resolution, deduplication, secret-content rejection, component scopes, and human approval before operational requests.
+
+The local worker libraries in `app.backup`, `app.recovery`, and `app.isolation` are utility code, not a claim of automatic execution. Backup copy/integrity, Fernet encryption, Linux immutable flags, recovery restore, and firewall operations are called only by an explicit worker/operator. The API's worker status transitions and approval gates remain the source of truth. The transferred backup helper intentionally does not use rsync `--delete`, rejects symlinks/unsafe restore paths, and will not silently replace a trusted hash baseline. The SSH `HostControl` implementation using automatic host-key acceptance was not transferred; a secure known-host-key provisioning model is required before an SSH worker is safe.
+
+Run project tests from the project root (`pytest -q`). The detector suite uses only fake HTTP responses. Never run the old live-host test against a real host; the destination tests exercise isolation with an in-memory mock.
+
 Implemented: database/session foundation, SQLite initialization, the core workflow models and relationships, Pydantic request/response schemas, shared risk score mapping, paginated read endpoints, basic asset registration, settings read, an append-oriented audit recording helper, normalized security-event ingestion with `(source, source_event_id)` idempotency, threat incident creation and controlled lifecycle operations, historical risk assessments, a recommendation-only decision contract, and a database-derived dashboard summary.
 
 Phase 1/2 ingestion routes do not have production authentication; Phase 6B adds MVP per-component token/scope checks to these internal ingestion routes:

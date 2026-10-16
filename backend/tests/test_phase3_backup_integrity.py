@@ -9,7 +9,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.database.session import get_db
 from app.main import app
-from app.models import Asset, AuditEvent, Base, Backup, IntegrityVerification
+from app.models import ActionRequest, Asset, AuditEvent, Base, Backup, IntegrityVerification
 
 
 @pytest.fixture
@@ -139,6 +139,12 @@ def test_phase3_backup_protection_verification_and_readiness(client: TestClient,
     assert approved.status_code == 200
     assert approved.json()["approval_status"] == "approved"
     assert approved.json()["execution_status"] == "not_started"
+    failed_claim = client.post(
+        f"/api/internal/backups/action-requests/{action_request['id']}/claim",
+        headers={"X-Internal-Component-Token": "phase3-test-component-token"},
+        json={"component_reference": "provider-job-failed", "correlation_id": correlation_id},
+    )
+    assert failed_claim.status_code == 200
 
     failed_protection = client.post(
         f"/api/internal/backups/{backup_id}/protection-result",
@@ -147,6 +153,7 @@ def test_phase3_backup_protection_verification_and_readiness(client: TestClient,
             "protection_status": "failed",
             "execution_status": "failed",
             "failure_reason": "Provider rejected protection request",
+            "component_reference": "provider-job-failed",
             "action_request_id": action_request["id"],
             "correlation_id": correlation_id,
         },
@@ -165,12 +172,28 @@ def test_phase3_backup_protection_verification_and_readiness(client: TestClient,
             "request_reason": "Retry after external correction",
         },
     ).json()
+    approved_retry = client.post(
+        f"/api/action-requests/{passed_protection_request['id']}/approve",
+        headers={"Authorization": "Bearer phase6-approver-test-token"},
+        json={},
+    )
+    assert approved_retry.status_code == 200
+    retry_claim = client.post(
+        f"/api/internal/backups/action-requests/{passed_protection_request['id']}/claim",
+        headers={"X-Internal-Component-Token": "phase3-test-component-token"},
+        json={
+            "component_reference": "provider-job-42",
+            "correlation_id": passed_protection_request["correlation_id"],
+        },
+    )
+    assert retry_claim.status_code == 200
     protection_started = client.post(
         f"/api/internal/backups/{backup_id}/protection-result",
         headers={"X-Internal-Component-Token": "phase3-test-component-token"},
         json={
             "protection_status": "pending",
             "execution_status": "executing",
+            "component_reference": "provider-job-42",
             "action_request_id": passed_protection_request["id"],
         },
     )
@@ -218,13 +241,35 @@ def test_phase3_backup_protection_verification_and_readiness(client: TestClient,
     assert requested["result_status"] == "queued"
     verification_id = requested["verification_id"]
 
+    verification_action_request = db.scalar(
+        select(ActionRequest).where(ActionRequest.verification_id == verification_id)
+    )
+    assert verification_action_request is not None
+    approved_verification = client.post(
+        f"/api/action-requests/{verification_action_request.id}/approve",
+        headers={"Authorization": "Bearer phase6-approver-test-token"},
+        json={},
+    )
+    assert approved_verification.status_code == 200
+    worker_claim = client.post(
+        f"/api/internal/integrity-verifications/{verification_id}/claim",
+        headers={"X-Internal-Component-Token": "phase3-test-component-token"},
+        json={
+            "component_reference": "verifier-job-001",
+            "correlation_id": correlation_id,
+        },
+    )
+    assert worker_claim.status_code == 200, worker_claim.text
+    assert worker_claim.json()["result_status"] == "running"
+
     internal_result_path = f"/api/internal/integrity-verifications/{verification_id}/result"
     result_body = {
         "result_status": "passed",
         "algorithm": "component-defined-v1",
-        "expected_digest": "trusted-digest-reference-value",
-        "observed_digest": "observed-digest-reference-value",
-        "verifier_component": "integrity-agent",
+        "expected_digest": "b" * 64,
+        "observed_digest": "b" * 64,
+        "verifier_component": "spoofed-value-is-ignored",
+        "component_reference": "verifier-job-001",
         "verifier_version": "2.4",
         "correlation_id": correlation_id,
     }
@@ -256,6 +301,25 @@ def test_phase3_backup_protection_verification_and_readiness(client: TestClient,
         json={"reason": "Repeat test"},
     ).json()
     assert failed_verification["correlation_id"] != correlation_id
+    failed_action_request = db.scalar(
+        select(ActionRequest).where(ActionRequest.verification_id == failed_verification["verification_id"])
+    )
+    assert failed_action_request is not None
+    failed_approved = client.post(
+        f"/api/action-requests/{failed_action_request.id}/approve",
+        headers={"Authorization": "Bearer phase6-approver-test-token"},
+        json={},
+    )
+    assert failed_approved.status_code == 200
+    failed_claim = client.post(
+        f"/api/internal/integrity-verifications/{failed_verification['verification_id']}/claim",
+        headers={"X-Internal-Component-Token": "phase3-test-component-token"},
+        json={
+            "component_reference": "verifier-job-002",
+            "correlation_id": failed_verification["correlation_id"],
+        },
+    )
+    assert failed_claim.status_code == 200
     failed_result = client.post(
         f"/api/internal/integrity-verifications/{failed_verification['verification_id']}/result",
         headers={"X-Internal-Component-Token": "phase3-test-component-token"},
@@ -263,7 +327,9 @@ def test_phase3_backup_protection_verification_and_readiness(client: TestClient,
             "result_status": "failed",
             "observed_digest": "mismatch-evidence",
             "verifier_component": "integrity-agent",
+            "component_reference": "verifier-job-002",
             "failure_reason": "Component reported mismatch",
+            "correlation_id": failed_verification["correlation_id"],
         },
     )
     assert failed_result.status_code == 200

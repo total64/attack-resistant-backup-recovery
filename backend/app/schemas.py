@@ -420,7 +420,6 @@ class DecisionCreate(APIModel):
     assessment_id: UUID
     asset_id: UUID
     recommended_actions: list[ActionType] = Field(
-        min_length=1,
         description="Proposed actions only; creating a decision does not request, approve, or execute them.",
     )
     rationale: str = Field(min_length=1)
@@ -590,6 +589,7 @@ class IntegrityVerificationResult(APIModel):
     observed_digest: str | None = Field(default=None, max_length=512)
     verification_evidence_reference: str | None = Field(default=None, max_length=1024)
     verifier_component: str = Field(min_length=1, max_length=100)
+    component_reference: str = Field(min_length=1, max_length=255)
     verifier_version: str | None = Field(default=None, max_length=100)
     started_at: UTCDateTime | None = None
     completed_at: UTCDateTime | None = None
@@ -605,6 +605,7 @@ class IntegrityVerificationResult(APIModel):
                 raise ValueError("A passed result requires observed digest or verification evidence")
         _reject_sensitive_content(self.trusted_manifest_reference)
         _reject_sensitive_content(self.verification_evidence_reference)
+        _reject_sensitive_content(self.component_reference)
         _reject_sensitive_content(self.failure_reason)
         return self
 
@@ -636,6 +637,62 @@ class BackupProtectionResult(APIModel):
         return self
 
 
+class BackupWorkerClaim(APIModel):
+    component_reference: str = Field(min_length=1, max_length=255)
+    correlation_id: UUID
+
+    @model_validator(mode="after")
+    def validate_reference(self):
+        _reject_sensitive_content(self.component_reference)
+        return self
+
+
+class BackupCreationResult(APIModel):
+    execution_status: ActionExecutionStatus
+    external_backup_id: str | None = Field(default=None, min_length=1, max_length=255)
+    created_at: UTCDateTime | None = None
+    backup_type: str | None = Field(default=None, max_length=100)
+    size_bytes: int | None = Field(default=None, ge=0)
+    storage_reference: str | None = Field(default=None, max_length=1024)
+    manifest_reference: str | None = Field(default=None, max_length=1024)
+    encryption_status: str | None = Field(default=None, max_length=50)
+    failure_reason: str | None = Field(default=None, max_length=4000)
+    component_reference: str = Field(min_length=1, max_length=255)
+    correlation_id: UUID
+
+    @model_validator(mode="after")
+    def validate_result(self):
+        if self.execution_status not in {ActionExecutionStatus.SUCCEEDED, ActionExecutionStatus.FAILED}:
+            raise ValueError("Backup creation result must be succeeded or failed")
+        if self.execution_status == ActionExecutionStatus.SUCCEEDED:
+            if not all((self.external_backup_id, self.created_at, self.storage_reference, self.manifest_reference, self.encryption_status)):
+                raise ValueError("Successful backup creation requires an ID, timestamps, storage, manifest, and encryption status")
+        elif not self.failure_reason:
+            raise ValueError("Failed backup creation requires failure_reason")
+        _reject_sensitive_content(self.component_reference)
+        _reject_sensitive_content(self.storage_reference)
+        _reject_sensitive_content(self.manifest_reference)
+        _reject_sensitive_content(self.failure_reason)
+        return self
+
+
+class BackupCreationResultRead(APIModel):
+    backup: BackupRead | None
+    action_request_id: UUID
+    execution_status: ActionExecutionStatus
+    correlation_id: UUID
+
+
+class IntegrityVerificationClaim(APIModel):
+    component_reference: str = Field(min_length=1, max_length=255)
+    correlation_id: UUID
+
+    @model_validator(mode="after")
+    def validate_reference(self):
+        _reject_sensitive_content(self.component_reference)
+        return self
+
+
 class BackupProtectionResultRead(APIModel):
     backup: BackupRead
     action_request_id: UUID | None
@@ -659,6 +716,11 @@ class IntegrityVerificationRead(APIModel):
     completed_at: UTCDateTime | None
     failure_reason: str | None
     correlation_id: UUID
+
+
+class IntegrityVerificationClaimRead(APIModel):
+    verification: IntegrityVerificationRead
+    backup: BackupRead
 
 
 class IntegrityVerificationRequested(APIModel):

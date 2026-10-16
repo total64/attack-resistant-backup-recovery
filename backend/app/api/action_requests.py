@@ -29,7 +29,9 @@ router = APIRouter(
 
 def _create_action_request(payload: ActionRequestCreate, db: Session, current_user: UserPrincipal) -> ActionRequest:
     if payload.action_type not in (
+        ActionType.CREATE_BACKUP.value,
         ActionType.PROTECT_BACKUP.value,
+        ActionType.VERIFY_BACKUP.value,
         ActionType.VERIFY_BACKUP.value,
         ActionType.ISOLATE.value,
         ActionType.RECOVER.value,
@@ -56,6 +58,8 @@ def _create_action_request(payload: ActionRequestCreate, db: Session, current_us
 
     if payload.action_type == ActionType.PROTECT_BACKUP.value and backup is None:
         raise HTTPException(status_code=422, detail="protect_backup requires backup_id")
+    if payload.action_type == ActionType.CREATE_BACKUP.value and asset is None:
+        raise HTTPException(status_code=422, detail="create_backup requires an existing asset_id")
     if payload.action_type == ActionType.VERIFY_BACKUP.value:
         if verification is None or backup is None:
             raise HTTPException(status_code=422, detail="verify_backup requires backup_id and verification_id")
@@ -72,7 +76,7 @@ def _create_action_request(payload: ActionRequestCreate, db: Session, current_us
             detail="recover requests require asset_id, incident_id, backup_id, and verification_id",
         )
 
-    asset_id = str(payload.asset_id) if payload.asset_id else (backup.asset_id if backup else verification.asset_id)
+    asset_id = str(payload.asset_id) if payload.asset_id else (backup.asset_id if backup else verification.asset_id if verification else None)
     if backup and backup.asset_id != asset_id:
         raise HTTPException(status_code=409, detail="Action asset does not match backup asset")
     if verification and verification.asset_id != asset_id:
@@ -143,7 +147,9 @@ def _create_action_request(payload: ActionRequestCreate, db: Session, current_us
             actor_type="user",
             actor_id=current_user.user_id,
             action=(
-                "backup.protection.requested"
+                "backup.creation.requested"
+                if payload.action_type == ActionType.CREATE_BACKUP.value
+                else "backup.protection.requested"
                 if backup and payload.action_type == ActionType.PROTECT_BACKUP.value
                 else "isolation.requested"
                 if payload.action_type == ActionType.ISOLATE.value
@@ -225,7 +231,9 @@ def approve_action_request(
 ):
     action_request = get_or_404(db, ActionRequest, str(action_request_id), "Action request")
     approvable_types = {
+        ActionType.CREATE_BACKUP.value,
         ActionType.PROTECT_BACKUP.value,
+        ActionType.VERIFY_BACKUP.value,
         ActionType.ISOLATE.value,
         ActionType.RELEASE_ISOLATION.value,
         ActionType.RECOVER.value,
@@ -278,6 +286,10 @@ def approve_action_request(
                 if action_request.action_type == ActionType.ISOLATE.value
                 else "recovery.approved"
                 if action_request.action_type == ActionType.RECOVER.value
+                else "backup.creation.approved"
+                if action_request.action_type == ActionType.CREATE_BACKUP.value
+                else "integrity_verification.approved"
+                if action_request.action_type == ActionType.VERIFY_BACKUP.value
                 else "backup.protection.approved"
             ),
             result_status="success",
@@ -307,7 +319,9 @@ def reject_action_request(
 ):
     action_request = get_or_404(db, ActionRequest, str(action_request_id), "Action request")
     if action_request.action_type not in {
+        ActionType.CREATE_BACKUP.value,
         ActionType.ISOLATE.value,
+        ActionType.VERIFY_BACKUP.value,
         ActionType.RELEASE_ISOLATION.value,
         ActionType.RECOVER.value,
         ActionType.PROTECT_BACKUP.value,
@@ -357,6 +371,10 @@ def reject_action_request(
                 if action_request.action_type == ActionType.RELEASE_ISOLATION.value
                 else "recovery.rejected"
                 if action_request.action_type == ActionType.RECOVER.value
+                else "backup.creation.rejected"
+                if action_request.action_type == ActionType.CREATE_BACKUP.value
+                else "integrity_verification.rejected"
+                if action_request.action_type == ActionType.VERIFY_BACKUP.value
                 else "isolation.rejected"
             ),
             result_status="rejected",

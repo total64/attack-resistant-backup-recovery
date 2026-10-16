@@ -1,8 +1,10 @@
 from datetime import datetime, timezone
+import json
 from uuid import UUID, uuid4
 
 import pytest
 from fastapi import HTTPException, Response
+from fastapi.testclient import TestClient
 from pydantic import ValidationError
 from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import Session
@@ -14,6 +16,7 @@ from app.api.health import health_check
 from app.api.risk_assessments import create_risk_assessment
 from app.api.security_events import ingest_security_event
 from app.api.threats import create_threat, triage_threat
+from app.database.session import get_db
 from app.main import app, root
 from app.models import (
     ActionRequest,
@@ -54,7 +57,12 @@ def db():
     engine.dispose()
 
 
-def test_phase2_end_to_end_workflow_and_audit(db: Session):
+def test_phase2_end_to_end_workflow_and_audit(db: Session, monkeypatch):
+    # This test exercises the original manually staged Phase 2 API contract.
+    # A separate HTTP integration test below exercises the automatic pipeline.
+    from app.services import event_pipeline
+
+    monkeypatch.setattr(event_pipeline, "process_security_event", lambda _db, _event: None)
     correlation_id = uuid4()
     asset = Asset(hostname="phase2-test-host", external_source="test", external_id="host-001")
     db.add(asset)
@@ -176,6 +184,61 @@ def test_phase2_end_to_end_workflow_and_audit(db: Session):
         "decision.create",
         "threat_incident.lifecycle_change",
     } <= successful_actions
+
+
+def test_detector_payload_runs_authenticated_persisted_pipeline(db: Session, monkeypatch):
+    from detector.converter import detection_to_payload
+    from detector.schema import Detection
+
+    asset = Asset(hostname="detector-host", external_source="wazuh", external_id="agent-001")
+    db.add(asset)
+    db.commit()
+    monkeypatch.setenv(
+        "MVP_COMPONENT_TOKENS",
+        json.dumps([{
+            "component_id": "detector",
+            "token": "integration-test-only-token",
+            "scopes": ["security_events:write"],
+        }]),
+    )
+
+    def override_db():
+        yield db
+
+    app.dependency_overrides[get_db] = override_db
+    try:
+        client = TestClient(app)
+        payload = detection_to_payload(Detection(
+            agent_id="agent-001",
+            agent_name="agent-001",
+            host="detector-host",
+            detection_type="ransomware_confirmed",
+            severity="critical",
+            raw_alert_id="wazuh-alert-42",
+            evidence={"backup_deletion": True},
+        ))
+        headers = {"X-Internal-Component-Token": "integration-test-only-token"}
+        first = client.post("/api/internal/security-events", json=payload, headers=headers)
+        duplicate = client.post("/api/internal/security-events", json=payload, headers=headers)
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert first.status_code == 201, first.text
+    assert duplicate.status_code == 200
+    assert duplicate.json()["duplicate"] is True
+    event_data = first.json()["event"]
+    assert event_data["processing_status"] == "processed"
+    event = db.get(SecurityEvent, event_data["id"])
+    assert event is not None and event.incident_id is not None
+    incident = db.get(ThreatIncident, event.incident_id)
+    assert incident is not None and incident.security_events[0].id == event.id
+    assessment = db.get(RiskAssessment, incident.current_risk_assessment_id)
+    assert assessment is not None and assessment.score == 100
+    decision = db.scalar(select(Decision).where(Decision.assessment_id == assessment.id))
+    assert decision is not None
+    assert decision.recommended_actions == ["isolate"]
+    assert decision.approval_required is True
+    assert db.scalar(select(func.count(ActionRequest.id))) == 0
 
 
 def test_invalid_references_scores_and_correlations(db: Session):

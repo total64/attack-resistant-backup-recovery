@@ -30,6 +30,29 @@ router = APIRouter(
 internal_router = APIRouter(prefix="/api/internal/recovery-jobs", tags=["Internal Recovery Component"])
 recovery_component = require_component_scope(ComponentScope.RECOVERY_WRITE)
 
+
+@internal_router.get("/queue", dependencies=[Depends(recovery_component)])
+def list_queued_recovery_work(
+    db: Session = Depends(get_db),
+    _component: ComponentPrincipal = Depends(recovery_component),
+):
+    """List queued jobs; claim still revalidates approval, isolation and backup state."""
+    return [
+        {
+            "recovery_job_id": job.id,
+            "action_request_id": job.action_request_id,
+            "asset_id": job.asset_id,
+            "incident_id": job.incident_id,
+            "backup_id": job.backup_id,
+            "verification_id": job.verification_id,
+            "correlation_id": job.correlation_id,
+        }
+        for job in db.query(RecoveryJob)
+        .filter(RecoveryJob.job_status == RecoveryJobStatus.QUEUED.value)
+        .order_by(RecoveryJob.created_at.asc())
+        .all()
+    ]
+
 TERMINAL_STATUSES = {RecoveryJobStatus.COMPLETED.value, RecoveryJobStatus.FAILED.value, RecoveryJobStatus.CANCELLED.value}
 
 

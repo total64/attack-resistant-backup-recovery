@@ -6,15 +6,18 @@ from sqlalchemy.orm import Session
 
 from app.api.common import as_utc, get_or_404, paginate
 from app.database.session import get_db
-from app.enums import ActionType, VerificationStatus
+from app.enums import ActionExecutionStatus, ActionType, VerificationStatus
 from app.models import ActionRequest, Backup, IntegrityVerification
 from app.schemas import (
     AuditEventCreate,
     IntegrityVerificationCreate,
+    IntegrityVerificationClaim,
+    IntegrityVerificationClaimRead,
     IntegrityVerificationRead,
     IntegrityVerificationRequested,
     IntegrityVerificationResult,
     Page,
+    BackupRead,
 )
 from app.services.audit import record_audit_event, record_phase2_audit
 from app.services.internal_auth import ComponentPrincipal, ComponentScope, require_component_scope
@@ -35,6 +38,32 @@ internal_router = APIRouter(
     tags=["Internal Integrity Component"],
 )
 verification_component = require_component_scope(ComponentScope.VERIFICATION_WRITE)
+
+
+@internal_router.get("/queue", dependencies=[Depends(verification_component)])
+def list_approved_integrity_work(
+    db: Session = Depends(get_db),
+    _component: ComponentPrincipal = Depends(verification_component),
+):
+    """List approved queued verifications for the scoped verifier worker."""
+    return [
+        {
+            "verification_id": verification.id,
+            "backup_id": verification.backup_id,
+            "correlation_id": verification.correlation_id,
+            "action_request_id": action_request.id,
+        }
+        for verification, action_request in db.query(IntegrityVerification, ActionRequest)
+        .join(ActionRequest, ActionRequest.verification_id == IntegrityVerification.id)
+        .filter(
+            IntegrityVerification.result_status == VerificationStatus.QUEUED.value,
+            ActionRequest.action_type == ActionType.VERIFY_BACKUP.value,
+            ActionRequest.approval_status == "approved",
+            ActionRequest.execution_status == "not_started",
+        )
+        .order_by(IntegrityVerification.created_at.asc())
+        .all()
+    ]
 
 
 @backup_router.post(
@@ -101,6 +130,64 @@ def request_integrity_verification(
 
 
 @internal_router.post(
+    "/{verification_id}/claim",
+    response_model=IntegrityVerificationClaimRead,
+    dependencies=[Depends(verification_component)],
+)
+def claim_integrity_verification(
+    verification_id: UUID,
+    payload: IntegrityVerificationClaim,
+    db: Session = Depends(get_db),
+    component: ComponentPrincipal = Depends(verification_component),
+):
+    verification = get_or_404(db, IntegrityVerification, str(verification_id), "Integrity verification")
+    action_request = db.query(ActionRequest).filter(ActionRequest.verification_id == verification.id).first()
+    if action_request is None or action_request.action_type != ActionType.VERIFY_BACKUP.value:
+        raise HTTPException(status_code=409, detail="Verification has no authorized verify_backup ActionRequest")
+    if action_request.approval_status != "approved":
+        raise HTTPException(status_code=409, detail="Verification ActionRequest must be approved before execution")
+    existing_reference = action_request.component_result.get("component_reference")
+    if verification.result_status == VerificationStatus.RUNNING.value:
+        if existing_reference == payload.component_reference:
+            return IntegrityVerificationClaimRead(
+                verification=IntegrityVerificationRead.model_validate(verification),
+                backup=BackupRead.model_validate(get_or_404(db, Backup, verification.backup_id, "Backup")),
+            )
+        raise HTTPException(status_code=409, detail="Verification is already claimed by another component reference")
+    if verification.result_status != VerificationStatus.QUEUED.value or action_request.execution_status != "not_started":
+        raise HTTPException(status_code=409, detail="Only a queued verification can be claimed")
+
+    now = datetime.now(timezone.utc)
+    verification.result_status = VerificationStatus.RUNNING.value
+    verification.verifier_component = component.component_id
+    verification.started_at = now
+    action_request.execution_status = ActionExecutionStatus.EXECUTING.value
+    action_request.started_at = now
+    action_request.component_result = {"component_reference": payload.component_reference}
+    record_phase2_audit(
+        db,
+        action="integrity_verification.started",
+        result_status="started",
+        resource_type="integrity_verification",
+        resource_id=verification.id,
+        backup_id=verification.backup_id,
+        verification_id=verification.id,
+        action_request_id=action_request.id,
+        asset_id=action_request.asset_id,
+        correlation_id=verification.correlation_id,
+        actor_id=component.component_id,
+        source_component=component.component_id,
+        safe_metadata={"component_reference": payload.component_reference},
+    )
+    db.commit()
+    db.refresh(verification)
+    return IntegrityVerificationClaimRead(
+        verification=IntegrityVerificationRead.model_validate(verification),
+        backup=BackupRead.model_validate(get_or_404(db, Backup, verification.backup_id, "Backup")),
+    )
+
+
+@internal_router.post(
     "/{verification_id}/result",
     response_model=IntegrityVerificationRead,
     dependencies=[Depends(verification_component)],
@@ -159,6 +246,17 @@ def report_integrity_result(
         .order_by(ActionRequest.created_at.desc())
         .first()
     )
+    if action_request is None or action_request.action_type != ActionType.VERIFY_BACKUP.value:
+        raise HTTPException(status_code=409, detail="Verification has no authorized verify_backup ActionRequest")
+    if action_request.approval_status != "approved":
+        raise HTTPException(status_code=409, detail="Verification ActionRequest must be approved before component results")
+    if action_request.execution_status != ActionExecutionStatus.EXECUTING.value:
+        raise HTTPException(status_code=409, detail="Verification must be claimed before reporting a component result")
+    if action_request.component_result.get("component_reference") != payload.component_reference:
+        raise HTTPException(status_code=409, detail="Verifier component reference does not match the claim")
+    if payload.result_status == VerificationStatus.PASSED and payload.expected_digest and payload.observed_digest:
+        if payload.expected_digest.lower() != payload.observed_digest.lower():
+            raise HTTPException(status_code=409, detail="A passed integrity result must match the trusted expected digest")
     if action_request is not None:
         if payload.result_status == VerificationStatus.RUNNING:
             action_request.execution_status = "executing"
@@ -166,7 +264,11 @@ def report_integrity_result(
         elif payload.result_status == VerificationStatus.CANCELLED:
             action_request.execution_status = "cancelled"
             action_request.completed_at = verification.completed_at
-        elif payload.result_status == VerificationStatus.ERROR:
+        elif payload.result_status in {
+            VerificationStatus.FAILED,
+            VerificationStatus.INCONCLUSIVE,
+            VerificationStatus.ERROR,
+        }:
             action_request.execution_status = "failed"
             action_request.completed_at = verification.completed_at
         else:
