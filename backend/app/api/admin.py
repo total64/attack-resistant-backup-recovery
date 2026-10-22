@@ -4,7 +4,7 @@ from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
 from app.database.session import get_db
-from app.models import AuditEvent, Backup, IntegrityVerification, RecoveryJob, SecurityEvent, ThreatIncident, UserAccount
+from app.models import AuditEvent, Backup, IntegrityVerification, IsolationAction, RecoveryJob, SecurityEvent, ThreatIncident, UserAccount
 from app.schemas import AdminOverviewRead
 from app.services.user_auth import (
     UserPrincipal,
@@ -65,9 +65,9 @@ def get_admin_overview(
             "url": wazuh_url or None,
             "message": "Configured for security event ingestion" if wazuh_url else "Wazuh integration endpoint not configured",
         },
-        "backup_subsystem": {"status": "operational"},
-        "recovery_subsystem": {"status": "operational"},
-        "isolation_subsystem": {"status": "operational"},
+        "backup_subsystem": {"status": "component_worker_managed"},
+        "recovery_subsystem": {"status": "component_worker_managed"},
+        "isolation_subsystem": {"status": "component_worker_managed"},
     }
 
     # 3. Security summary
@@ -85,11 +85,27 @@ def get_admin_overview(
         .scalar()
         or 0
     )
+    pending_events = (
+        db.query(func.count(SecurityEvent.id))
+        .filter(SecurityEvent.processing_status.in_(("received", "normalized")))
+        .scalar()
+        or 0
+    )
+    active_isolation_operations = (
+        db.query(func.count(IsolationAction.id))
+        .filter(IsolationAction.execution_status.in_(
+            ("requested", "awaiting_approval", "approved", "executing", "isolated", "release_requested")
+        ))
+        .scalar()
+        or 0
+    )
+    system_health["isolation_subsystem"]["active_operations"] = active_isolation_operations
 
     security_summary = {
         "total_events": total_events,
         "active_threats": active_threats,
         "critical_events": critical_events,
+        "pending_events": pending_events,
     }
 
     # 4. Backup & Recovery summary

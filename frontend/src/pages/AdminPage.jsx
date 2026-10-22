@@ -98,28 +98,13 @@ export default function AdminPage() {
   }, [isAuthorized])
 
   useEffect(() => {
-    if (isAuthorized) {
-      let isMounted = true
-      const load = async () => {
-        try {
-          const [users, overview] = await Promise.all([
-            api.get('/users'),
-            api.get('/admin/overview'),
-          ])
-          if (isMounted) {
-            setUsersList(Array.isArray(users) ? users : [])
-            setOverviewData(overview)
-          }
-        } catch {
-          // Individual fetchers will handle retry and error setting
-        }
-      }
-      load()
-      return () => {
-        isMounted = false
-      }
-    }
-  }, [isAuthorized])
+    if (!isAuthorized) return undefined
+    const timer = window.setTimeout(() => {
+      void fetchUsers()
+      void fetchOverview()
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [isAuthorized, fetchUsers, fetchOverview])
 
   const filteredUsers = useMemo(() => {
     return usersList.filter((account) => {
@@ -507,7 +492,7 @@ export default function AdminPage() {
                 />
                 <span style={{ fontSize: '14px', color: '#edf2f9' }}>
                   {overviewData?.system_health?.wazuh_integration?.status === 'configured'
-                    ? 'Connected / Configured'
+                    ? 'Configured (not probed)'
                     : 'Not Configured'}
                 </span>
               </div>
@@ -534,29 +519,24 @@ export default function AdminPage() {
               </h3>
               <div style={{ display: 'grid', gap: '10px', fontSize: '10px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
-                  <span>Security Event Processor</span>
-                  <span className="admin-status-indicator">
-                    <span className="admin-status-dot admin-status-dot--green" /> Operational
-                  </span>
+                  <span>Security Events Awaiting Processing</span>
+                  <span>{overviewData?.security_summary?.pending_events ?? 'Unavailable'}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
-                  <span>Backup Integrity Verifier</span>
-                  <span className="admin-status-indicator">
-                    <span className="admin-status-dot admin-status-dot--green" /> Ready ({overviewData?.backup_recovery_summary?.verified_backups ?? 0} verified)
-                  </span>
+                  <span>Backups With Passing Verification</span>
+                  <span>{overviewData?.backup_recovery_summary?.verified_backups ?? 'Unavailable'}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
-                  <span>Automated Recovery Engine</span>
-                  <span className="admin-status-indicator">
-                    <span className="admin-status-dot admin-status-dot--green" /> Operational ({overviewData?.backup_recovery_summary?.recovery_jobs ?? 0} jobs)
-                  </span>
+                  <span>Recovery Jobs Recorded</span>
+                  <span>{overviewData?.backup_recovery_summary?.recovery_jobs ?? 'Unavailable'}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
-                  <span>System Isolation Agent</span>
-                  <span className="admin-status-indicator">
-                    <span className="admin-status-dot admin-status-dot--green" /> Standby
-                  </span>
+                  <span>Isolation Requests (worker-managed)</span>
+                  <span>{overviewData?.system_health?.isolation_subsystem?.active_operations ?? 'Unavailable'}</span>
                 </div>
+                <p style={{ margin: '4px 0 0', color: '#8c97a8', fontSize: '10px' }}>
+                  Backup, verification, recovery, and isolation execution require their authorized component workers; registered workflows do not imply a worker is online.
+                </p>
               </div>
             </div>
 

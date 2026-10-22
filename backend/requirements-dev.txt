@@ -1,3 +1,4 @@
 -r requirements.txt
-pytest
-httpx2
+
+pytest>=7.0
+httpx>=0.24

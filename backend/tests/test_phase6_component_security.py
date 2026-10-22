@@ -287,6 +287,20 @@ def test_integrity_verifier_identity_is_server_derived(client: TestClient, db: S
         correlation_id=backup.correlation_id,
     )
     db.add(verification)
+    db.flush()
+    verification_request = ActionRequest(
+        action_type="verify_backup",
+        asset_id=asset.id,
+        backup_id=backup.id,
+        verification_id=verification.id,
+        requested_by_type="user",
+        requested_by_id="verification-requester",
+        approval_status="approved",
+        execution_status="executing",
+        component_result={"component_reference": "verify-claim-1"},
+        correlation_id=verification.correlation_id,
+    )
+    db.add(verification_request)
     db.commit()
 
     result = client.post(
@@ -294,9 +308,10 @@ def test_integrity_verifier_identity_is_server_derived(client: TestClient, db: S
         headers=_component_auth("integrity-verifier"),
         json={
             "result_status": "passed",
-            "expected_digest": "expected-digest",
-            "observed_digest": "observed-digest",
+            "expected_digest": "a" * 64,
+            "observed_digest": "a" * 64,
             "verifier_component": "spoofed-verifier",
+            "component_reference": "verify-claim-1",
             "correlation_id": verification.correlation_id,
         },
     )
