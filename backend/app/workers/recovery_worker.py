@@ -65,47 +65,38 @@ class RecoveryWorker:
         if claimed.get("job_status") != "restoring":
             raise RuntimeError("Backend did not move the approved queued job to restoring")
 
-        restored = self.manager.recover(
-            str(backup_path), str(restore_path), expected_hashes,
-            list(expected_hashes.keys()),
-        )
+        try:
+            restored = self.manager.recover(
+                str(backup_path), str(restore_path), expected_hashes,
+                list(expected_hashes.keys()),
+            )
+        except Exception as error:
+            return self._report_failure(base, common, "not_started", "failed", f"Recovery manager raised {type(error).__name__}")
         if not restored.get("success"):
-            return self.client.post(f"{base}/result", {
-                **common,
-                "job_status": "failed",
-                "malware_scan_status": "not_started",
-                "security_validation_status": "failed",
-                "failure_reason": str(restored.get("reason") or restored.get("error") or restored.get("status")),
-            })
+            reason = restored.get("reason") or restored.get("error") or restored.get("status")
+            safe_reason = str(reason) if isinstance(reason, str) and reason.isidentifier() else "Recovery manager rejected or failed the restore"
+            return self._report_failure(base, common, "not_started", "failed", safe_reason)
 
         security_check = BackupVerifier().verify_backup(str(restore_path), expected_hashes)
         if not security_check.get("trusted"):
-            return self.client.post(f"{base}/result", {
-                **common,
-                "job_status": "failed",
-                "malware_scan_status": "not_started",
-                "security_validation_status": "failed",
-                "failure_reason": "Restored output failed hash validation",
-            })
+            return self._report_failure(base, common, "not_started", "failed", "Restored output failed hash validation")
 
-        scan = self.scanner(restore_path)
-        if not isinstance(scan, dict) or not scan.get("evidence_reference"):
-            return self.client.post(f"{base}/result", {
-                **common,
-                "job_status": "failed",
-                "malware_scan_status": "inconclusive",
-                "security_validation_status": "passed",
-                "failure_reason": "Malware scanner did not return a verifiable evidence reference",
-            })
+        scanning = self.client.post(f"{base}/result", {
+            **common,
+            "job_status": "scanning",
+            "malware_scan_status": "running",
+            "security_validation_status": "running",
+        })
+        if scanning.get("job_status") != "scanning":
+            raise RuntimeError("Backend did not accept the scanning transition; malware scanner was not run")
+        try:
+            scan = self.scanner(restore_path)
+        except Exception as error:
+            return self._report_failure(base, common, "inconclusive", "passed", f"Malware scanner raised {type(error).__name__}")
+        if not isinstance(scan, dict) or not isinstance(scan.get("evidence_reference"), str) or not scan["evidence_reference"].strip():
+            return self._report_failure(base, common, "inconclusive", "passed", "Malware scanner returned no evidence reference")
         if scan.get("passed") is not True:
-            return self.client.post(f"{base}/result", {
-                **common,
-                "job_status": "failed",
-                "malware_scan_status": "failed",
-                "security_validation_status": "passed",
-                "failure_reason": "Malware scanner did not confirm a clean recovery point",
-                "result_evidence_reference": scan["evidence_reference"],
-            })
+            return self._report_failure(base, common, "failed", "passed", "Malware scanner did not confirm a clean recovery point", scan["evidence_reference"])
         return self.client.post(f"{base}/result", {
             **common,
             "job_status": "completed",
@@ -114,3 +105,23 @@ class RecoveryWorker:
             "outcome": "Restore completed in the configured isolated recovery environment; cutover was not requested.",
             "result_evidence_reference": scan["evidence_reference"],
         })
+
+    def _report_failure(
+        self,
+        base: str,
+        common: dict,
+        malware_status: str,
+        security_status: str,
+        reason: str,
+        evidence_reference: str | None = None,
+    ) -> dict:
+        payload = {
+            **common,
+            "job_status": "failed",
+            "malware_scan_status": malware_status,
+            "security_validation_status": security_status,
+            "failure_reason": reason,
+        }
+        if evidence_reference:
+            payload["result_evidence_reference"] = evidence_reference
+        return self.client.post(f"{base}/result", payload)

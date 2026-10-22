@@ -260,7 +260,7 @@ def test_phase3_backup_protection_verification_and_readiness(client: TestClient,
         },
     )
     assert worker_claim.status_code == 200, worker_claim.text
-    assert worker_claim.json()["result_status"] == "running"
+    assert worker_claim.json()["verification"]["result_status"] == "running"
 
     internal_result_path = f"/api/internal/integrity-verifications/{verification_id}/result"
     result_body = {

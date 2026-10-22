@@ -33,60 +33,61 @@ class BackupCreationWorker:
         if source is None or not source.is_dir():
             raise ValueError("Asset must map to an existing source directory in trusted worker configuration")
         backup_id = str(uuid4())
-        self.storage_root.mkdir(parents=True, exist_ok=True)
-        self.manifest_root.mkdir(parents=True, exist_ok=True)
         target = self.storage_root / backup_id
         staging = self.storage_root / f".{backup_id}.staging"
 
-        self.client.post(
+        claim = self.client.post(
             f"/api/internal/backups/action-requests/{action_request_id}/claim",
             {"component_reference": self.component_reference, "correlation_id": correlation_id},
         )
-        result = self.manager.create_backup(backup_id, str(source), str(staging))
+        if (
+            claim.get("action_type") != "create_backup"
+            or claim.get("asset_id") != asset_id
+            or claim.get("correlation_id") != correlation_id
+        ):
+            raise ValueError("Claimed action does not match this backup creation request")
+
+        try:
+            self.storage_root.mkdir(parents=True, exist_ok=True)
+            self.manifest_root.mkdir(parents=True, exist_ok=True)
+            result = self.manager.create_backup(backup_id, str(source), str(staging))
+        except Exception as error:
+            shutil.rmtree(staging, ignore_errors=True)
+            return self._report_failure(action_request_id, correlation_id, f"Backup preparation failed ({type(error).__name__})")
         if result.status != "COMPLETED":
-            return self.client.post(
-                f"/api/internal/backups/action-requests/{action_request_id}/creation-result",
-                {
-                    "execution_status": "failed",
-                    "failure_reason": result.error or "Backup creation failed",
-                    "component_reference": self.component_reference,
-                    "correlation_id": correlation_id,
-                },
-            )
+            shutil.rmtree(staging, ignore_errors=True)
+            return self._report_failure(action_request_id, correlation_id, "Backup manager reported failure")
 
         encrypted = self.encryption_key is not None
         if encrypted:
-            encrypted_result = encrypt_backup_dir(staging, target, self.encryption_key)
+            try:
+                encrypted_result = encrypt_backup_dir(staging, target, self.encryption_key)
+            except Exception as error:
+                shutil.rmtree(staging, ignore_errors=True)
+                shutil.rmtree(target, ignore_errors=True)
+                return self._report_failure(action_request_id, correlation_id, f"Backup encryption failed ({type(error).__name__})")
             if not encrypted_result.success:
                 shutil.rmtree(staging, ignore_errors=True)
                 shutil.rmtree(target, ignore_errors=True)
-                return self.client.post(
-                    f"/api/internal/backups/action-requests/{action_request_id}/creation-result",
-                    {
-                        "execution_status": "failed",
-                        "failure_reason": "Backup encryption failed: " + "; ".join(encrypted_result.errors),
-                        "component_reference": self.component_reference,
-                        "correlation_id": correlation_id,
-                    },
-                )
+                return self._report_failure(action_request_id, correlation_id, "Backup encryption failed")
             shutil.rmtree(staging)
         else:
-            staging.rename(target)
+            try:
+                staging.rename(target)
+            except OSError as error:
+                shutil.rmtree(staging, ignore_errors=True)
+                return self._report_failure(action_request_id, correlation_id, f"Backup finalization failed ({type(error).__name__})")
 
         try:
             manifest = write_trusted_hash(target, backup_id, self.manifest_root)
         except (OSError, ValueError, FileExistsError) as error:
             shutil.rmtree(target, ignore_errors=True)
-            return self.client.post(
-                f"/api/internal/backups/action-requests/{action_request_id}/creation-result",
-                {
-                    "execution_status": "failed",
-                    "failure_reason": f"Trusted manifest could not be recorded: {error}",
-                    "component_reference": self.component_reference,
-                    "correlation_id": correlation_id,
-                },
-            )
-        file_count, size_bytes = BackupManager._get_statistics(target)
+            return self._report_failure(action_request_id, correlation_id, f"Trusted manifest failed ({type(error).__name__})")
+        try:
+            _, size_bytes = BackupManager._get_statistics(target)
+        except OSError as error:
+            shutil.rmtree(target, ignore_errors=True)
+            return self._report_failure(action_request_id, correlation_id, f"Backup statistics failed ({type(error).__name__})")
         return self.client.post(
             f"/api/internal/backups/action-requests/{action_request_id}/creation-result",
             {
@@ -98,6 +99,17 @@ class BackupCreationWorker:
                 "storage_reference": str(target),
                 "manifest_reference": str(manifest),
                 "encryption_status": "encrypted" if encrypted else "not_encrypted",
+                "component_reference": self.component_reference,
+                "correlation_id": correlation_id,
+            },
+        )
+
+    def _report_failure(self, action_request_id: str, correlation_id: str, reason: str) -> dict:
+        return self.client.post(
+            f"/api/internal/backups/action-requests/{action_request_id}/creation-result",
+            {
+                "execution_status": "failed",
+                "failure_reason": reason,
                 "component_reference": self.component_reference,
                 "correlation_id": correlation_id,
             },
