@@ -302,9 +302,10 @@ function BackupDetails({ backupId, onClose }) {
     Promise.all([
       api.get(`/backups/${encodeURIComponent(backupId)}`, { signal: controller.signal }),
       api.get(`/backups/${encodeURIComponent(backupId)}/recovery-eligibility`, { signal: controller.signal }),
-    ]).then(async ([backup, eligibility]) => {
+      api.get(`/integrity-verifications?backup_id=${encodeURIComponent(backupId)}&page=1&page_size=100`, { signal: controller.signal }),
+    ]).then(async ([backup, eligibility, verificationHistory]) => {
       const points = await api.get(`/assets/${encodeURIComponent(backup.asset_id)}/recovery-points?page=1&page_size=20`, { signal: controller.signal })
-      setState({ requestKey, data: { backup, eligibility, points }, loading: false, error: null })
+      setState({ requestKey, data: { backup, eligibility, points, verificationHistory }, loading: false, error: null })
     }).catch((error) => { if (error.name !== 'AbortError') setState({ requestKey, data: null, loading: false, error }) })
     return () => controller.abort()
   }, [backupId, refresh, requestKey])
@@ -312,7 +313,8 @@ function BackupDetails({ backupId, onClose }) {
   const data = currentState.data
   return <div className="event-drawer-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}><aside className="event-details-drawer" role="dialog" aria-modal="true" aria-labelledby="backup-details-title"><header className="event-drawer-header"><div><span className="eyebrow">Backend recovery point</span><h2 id="backup-details-title">Backup Details</h2></div><button className="icon-button" onClick={onClose} aria-label="Close details">×</button></header>
     <ApiState loading={currentState.loading} error={currentState.error} onRetry={() => setRefresh((value) => value + 1)}>{data && <><section className="detail-section"><dl className="event-detail-grid"><ApiDetail label="Backup ID" value={data.backup.backup_id} /><ApiDetail label="Asset ID" value={data.backup.asset_id} /><ApiDetail label="External backup ID" value={data.backup.external_backup_id} /><ApiDetail label="Created by component" value={data.backup.created_by_component} /><ApiDetail label="Created at" value={formatTimestamp(data.backup.created_at)} /><ApiDetail label="Backup type" value={data.backup.backup_type} /><ApiDetail label="Size" value={formatBytes(data.backup.size_bytes)} /><ApiDetail label="Lifecycle status" value={data.backup.lifecycle_status} /><ApiDetail label="Protection status" value={data.backup.protection_status} /><ApiDetail label="Encryption status" value={data.backup.encryption_status} /><ApiDetail label="Verified" value={data.backup.verified} /><ApiDetail label="Recovery eligible" value={data.eligibility.eligible} /><ApiDetail label="Eligibility reasons" value={data.eligibility.reasons} /><ApiDetail label="Correlation ID" value={data.backup.correlation_id} /></dl></section>
-      <section className="detail-section"><h3>Recovery points for asset</h3><p>{data.points.total} points returned; eligibility is backend-confirmed per record.</p>{data.points.items.map((point) => <p key={point.backup_id}>{point.backup_id} · eligible: {String(point.recovery_eligible)} · {point.eligibility_reasons.join(', ') || 'no reasons returned'}</p>)}</section></>}</ApiState>
+      <section className="detail-section"><h3>Recovery points for asset</h3><p>{data.points.total} points returned; eligibility is backend-confirmed per record.</p>{data.points.items.map((point) => <p key={point.backup_id}>{point.backup_id} · eligible: {String(point.recovery_eligible)} · {point.eligibility_reasons.join(', ') || 'no reasons returned'}</p>)}</section>
+      <section className="detail-section"><h3>Integrity verification history</h3>{data.verificationHistory.items.length === 0 ? <p>No verification operations are recorded for this backup.</p> : data.verificationHistory.items.map((verification) => <p key={verification.verification_id}>{verification.result_status} · started {formatTimestamp(verification.started_at)} · completed {formatTimestamp(verification.completed_at)}{verification.failure_reason ? ` · ${verification.failure_reason}` : ''}</p>)}</section></>}</ApiState>
   </aside></div>
 }
 
@@ -331,12 +333,30 @@ export function BackupsPage({ globalSearch = '' }) {
       setRefresh((value) => value + 1)
     } catch (requestError) { setActionState({ busy: false, error: requestError, message: '' }) }
   }
+  const requestBackupCreation = async (assetId) => {
+    setActionState({ busy: true, error: null, message: '' })
+    try {
+      const request = await api.post('/action-requests', {
+        action_type: 'create_backup',
+        asset_id: assetId,
+        request_reason: 'Backup creation requested from the frontend.',
+      })
+      setActionState({
+        busy: false,
+        error: null,
+        message: `Backup request recorded (${request.approval_status}/${request.execution_status}); approval and a scoped worker are required.`,
+      })
+      setRefresh((value) => value + 1)
+    } catch (requestError) {
+      setActionState({ busy: false, error: requestError, message: '' })
+    }
+  }
   const count = (predicate) => items.filter(predicate).length
   return <main className="backups-main"><PageHeading title="Backups" description="Backend backup metadata, verification state, and recovery eligibility." actions={<button className="toolbar-button" onClick={() => setRefresh((value) => value + 1)}>Refresh</button>} />
     <section className="backup-summary-grid"><article className="backup-summary-card"><div className="backup-summary-copy"><span className="eyebrow">Total Backups</span><strong>{data?.total ?? '—'}</strong><span>Backend total</span></div></article><article className="backup-summary-card"><div className="backup-summary-copy"><span className="eyebrow">Verified In Loaded Page</span><strong>{count((item) => item.verified)}</strong><span>Backend eligibility assessment</span></div></article><article className="backup-summary-card"><div className="backup-summary-copy"><span className="eyebrow">Recovery Eligible In Loaded Page</span><strong>{count((item) => item.recovery_eligible)}</strong><span>Backend-confirmed</span></div></article><article className="backup-summary-card"><div className="backup-summary-copy"><span className="eyebrow">Not Recovery Eligible · Loaded Page</span><strong>{count((item) => !item.recovery_eligible)}</strong><span>Backend eligibility assessment</span></div></article></section>
-    <ActionRequestApprovalPanel actionTypes={['protect_backup']} refresh={refresh} onChanged={() => setRefresh((value) => value + 1)} />
+    <ActionRequestApprovalPanel actionTypes={['create_backup', 'protect_backup', 'verify_backup']} refresh={refresh} onChanged={() => setRefresh((value) => value + 1)} />
     <section className="panel backup-repository-panel"><header className="backup-section-heading"><div><h2>Backup Repository</h2><p>Actual backend lifecycle, protection, verification, and eligibility fields.</p></div></header>{actionState.message && <p className="api-note" role="status">{actionState.message}</p>}{actionState.error && <ApiState error={actionState.error} />}
-      <ApiState loading={loading} error={error} onRetry={() => setRefresh((value) => value + 1)} empty={!loading && !error && filtered.length === 0 ? 'No backups match the current search.' : null}>{filtered.length > 0 && <ApiTable headings={['Backup ID', 'Asset ID', 'Type', 'Size', 'Created', 'Lifecycle', 'Protection', 'Verified', 'Recovery Eligible', 'Actions']} className="backup-table-scroll">{filtered.map((item) => <tr key={item.backup_id}><td className="backup-id">{item.backup_id}</td><td>{item.asset_id}</td><td>{displayValue(item.backup_type)}</td><td>{formatBytes(item.size_bytes)}</td><td>{formatTimestamp(item.created_at)}</td><td>{item.lifecycle_status}</td><td>{item.protection_status}</td><td>{String(item.verified)}</td><td>{String(item.recovery_eligible)}{item.eligibility_reasons.length > 0 && <small>{item.eligibility_reasons.join('; ')}</small>}</td><td><button className="row-action" onClick={() => setSelectedId(item.backup_id)}>Details</button> <button className="backup-verify-row" disabled={actionState.busy} onClick={() => requestVerification(item.backup_id)}>Request verification</button></td></tr>)}</ApiTable>}</ApiState>
+      <ApiState loading={loading} error={error} onRetry={() => setRefresh((value) => value + 1)} empty={!loading && !error && filtered.length === 0 ? 'No backups match the current search.' : null}>{filtered.length > 0 && <ApiTable headings={['Backup ID', 'Asset ID', 'Type', 'Size', 'Created', 'Lifecycle', 'Protection', 'Verified', 'Recovery Eligible', 'Actions']} className="backup-table-scroll">{filtered.map((item) => <tr key={item.backup_id}><td className="backup-id">{item.backup_id}</td><td>{item.asset_id}</td><td>{displayValue(item.backup_type)}</td><td>{formatBytes(item.size_bytes)}</td><td>{formatTimestamp(item.created_at)}</td><td>{item.lifecycle_status}</td><td>{item.protection_status}</td><td>{String(item.verified)}</td><td>{String(item.recovery_eligible)}{item.eligibility_reasons.length > 0 && <small>{item.eligibility_reasons.join('; ')}</small>}</td><td><button className="row-action" onClick={() => setSelectedId(item.backup_id)}>Details</button> <button className="backup-verify-row" disabled={actionState.busy} onClick={() => requestVerification(item.backup_id)}>Request verification</button> <button className="backup-verify-row" disabled={actionState.busy} onClick={() => requestBackupCreation(item.asset_id)}>Request backup</button></td></tr>)}</ApiTable>}</ApiState>
       <footer className="backup-table-footer">Showing {items.length} loaded of {data?.total ?? 0} backups. Verification is requested through the backend; only a component report can complete it.</footer>
     </section>
     {selectedId && <BackupDetails backupId={selectedId} onClose={() => setSelectedId(null)} />}

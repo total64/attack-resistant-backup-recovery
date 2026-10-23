@@ -61,6 +61,29 @@ def ingest_security_event(
         )
         db.commit()
         response.status_code = status.HTTP_200_OK
+        if existing.processing_status in {"received", "normalized"}:
+            from app.services.event_pipeline import process_security_event
+
+            try:
+                process_security_event(db, existing)
+            except Exception:
+                db.rollback()
+                existing = db.get(SecurityEvent, existing.id)
+                existing.processing_status = "normalized"
+                record_phase2_audit(
+                    db,
+                    action="security_event.processing_failed",
+                    result_status="failed",
+                    resource_type="security_event",
+                    resource_id=existing.id,
+                    event_id=existing.id,
+                    asset_id=existing.asset_id,
+                    correlation_id=existing.correlation_id,
+                    actor_id=component.component_id,
+                    source_component=component.component_id,
+                    reason="Event pipeline failed; event remains available for retry",
+                )
+                db.commit()
         return SecurityEventIngestResponse(event=existing, duplicate=True, correlation_id=existing.correlation_id)
 
     try:
@@ -146,6 +169,29 @@ def ingest_security_event(
     )
     db.commit()
     db.refresh(event)
+    from app.services.event_pipeline import process_security_event
+
+    try:
+        process_security_event(db, event)
+    except Exception:
+        db.rollback()
+        event = db.get(SecurityEvent, event.id)
+        event.processing_status = "normalized"
+        record_phase2_audit(
+            db,
+            action="security_event.processing_failed",
+            result_status="failed",
+            resource_type="security_event",
+            resource_id=event.id,
+            event_id=event.id,
+            asset_id=event.asset_id,
+            correlation_id=event.correlation_id,
+            actor_id=component.component_id,
+            source_component=component.component_id,
+            reason="Event pipeline failed; event remains available for retry",
+        )
+        db.commit()
+        db.refresh(event)
     return SecurityEventIngestResponse(event=event, duplicate=False, correlation_id=correlation_id)
 
 

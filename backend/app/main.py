@@ -3,6 +3,14 @@ from json import JSONDecodeError, loads
 import os
 from uuid import UUID, uuid4
 
+from dotenv import load_dotenv
+
+# Load .env from the backend/ directory (the working directory when running uvicorn)
+# so that secrets configured in .env are available without needing manual export.
+# Explicit environment variables always take precedence (override=False is the default).
+load_dotenv()
+
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 """
 models.py - Data models for the Cyber Resilience Decision Engine.
 
@@ -16,12 +17,15 @@ will all import these classes, so they all speak the same "language".
 
 # This lets us use modern type hints (like `list[str]`) safely in all
 # Python 3.8+ versions. It must be the first import in the file.
+=======
+>>>>>>> integration/deploy-main
 from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
+<<<<<<< HEAD
 from typing import Any, Dict, List, Optional
 
 
@@ -67,6 +71,16 @@ class ResponseAction(str, Enum):
         RECOVER - Damage has happened; restore from a trusted backup.
     """
 
+=======
+from typing import Any
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+class ResponseAction(str, Enum):
+>>>>>>> integration/deploy-main
     ALLOW = "ALLOW"
     ALERT = "ALERT"
     PROTECT = "PROTECT"
@@ -75,6 +89,7 @@ class ResponseAction(str, Enum):
 
 
 class RiskLevel(str, Enum):
+<<<<<<< HEAD
     """A human-friendly label for a numeric risk score.
 
     Score ranges (used by RiskAssessment.level_from_score):
@@ -84,12 +99,15 @@ class RiskLevel(str, Enum):
         75 - 100 -> CRITICAL
     """
 
+=======
+>>>>>>> integration/deploy-main
     LOW = "LOW"
     MEDIUM = "MEDIUM"
     HIGH = "HIGH"
     CRITICAL = "CRITICAL"
 
 
+<<<<<<< HEAD
 # ---------------------------------------------------------------------------
 # Dataclasses
 # ---------------------------------------------------------------------------
@@ -116,11 +134,16 @@ class SecurityEvent:
                     (file names, IP addresses, etc.). Free-form dictionary.
     """
 
+=======
+@dataclass
+class SecurityEvent:
+>>>>>>> integration/deploy-main
     event_id: str
     timestamp: datetime
     source: str
     event_type: str
     severity: int
+<<<<<<< HEAD
     # field(default_factory=dict) gives every event its OWN empty dict.
     # (Writing `= {}` directly is a classic Python bug: all objects would
     # share the same dictionary.)
@@ -136,10 +159,19 @@ class SecurityEvent:
             raise ValueError(
                 f"severity must be between 1 and 10, got {self.severity}"
             )
+=======
+    raw_data: dict[str, Any] = field(default_factory=dict)
+    host_id: str | None = None
+
+    def __post_init__(self) -> None:
+        if not 1 <= self.severity <= 10:
+            raise ValueError(f"severity must be between 1 and 10, got {self.severity}")
+>>>>>>> integration/deploy-main
 
 
 @dataclass
 class RiskAssessment:
+<<<<<<< HEAD
     """The result of analysing events and deciding how risky things are.
 
     Attributes:
@@ -178,6 +210,19 @@ class RiskAssessment:
         Returns:
             The matching RiskLevel.
         """
+=======
+    risk_score: float
+    risk_level: RiskLevel
+    factors: list[str] = field(default_factory=list)
+    timestamp: datetime = field(default_factory=_utc_now)
+
+    def __post_init__(self) -> None:
+        if not 0 <= self.risk_score <= 100:
+            raise ValueError(f"risk_score must be between 0 and 100, got {self.risk_score}")
+
+    @staticmethod
+    def level_from_score(score: float) -> RiskLevel:
+>>>>>>> integration/deploy-main
         if score >= 75:
             return RiskLevel.CRITICAL
         if score >= 50:
@@ -189,6 +234,7 @@ class RiskAssessment:
 
 @dataclass
 class BackupStatus:
+<<<<<<< HEAD
     """The health and trustworthiness of one backup.
 
     Before recovering, the engine must be sure the backup it restores from
@@ -205,6 +251,8 @@ class BackupStatus:
                             or "offsite-vault-1").
     """
 
+=======
+>>>>>>> integration/deploy-main
     backup_id: str
     timestamp: datetime
     integrity_verified: bool
@@ -212,16 +260,20 @@ class BackupStatus:
     location: str
 
     def is_safe_to_restore(self) -> bool:
+<<<<<<< HEAD
         """Return True only if the backup is BOTH verified AND trusted.
 
         We require both conditions. A backup that is intact but created
         after the attack started could still contain malware.
         """
+=======
+>>>>>>> integration/deploy-main
         return self.integrity_verified and self.trusted
 
 
 @dataclass
 class Decision:
+<<<<<<< HEAD
     """The final output of the Decision Engine: what to do and why.
 
     Attributes:
@@ -239,10 +291,13 @@ class Decision:
                            ["disable_network_share", "lock_backup_vault"].
     """
 
+=======
+>>>>>>> integration/deploy-main
     action: ResponseAction
     reason: str
     risk_assessment: RiskAssessment
     confidence: float
+<<<<<<< HEAD
     # Fields below have defaults, so they come after the required ones.
     # decision_id and timestamp are filled in automatically.
     decision_id: str = field(default_factory=_new_id)
@@ -256,3 +311,13 @@ class Decision:
             raise ValueError(
                 f"confidence must be between 0.0 and 1.0, got {self.confidence}"
             )
+=======
+    decision_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    timestamp: datetime = field(default_factory=_utc_now)
+    triggering_events: list[SecurityEvent] = field(default_factory=list)
+    actions_to_execute: list[str] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        if not 0.0 <= self.confidence <= 1.0:
+            raise ValueError(f"confidence must be between 0.0 and 1.0, got {self.confidence}")
+>>>>>>> integration/deploy-main

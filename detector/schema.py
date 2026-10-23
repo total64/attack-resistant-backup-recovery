@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 """
 The handoff contract between Detection (Member 1) and the Risk Engine
 (Member 2). This is the normalized record format written to the shared
@@ -7,6 +8,10 @@ Keep this file as the single source of truth for the schema - if the
 format changes, update it here first and tell Member 2.
 """
 from dataclasses import dataclass, field, asdict
+=======
+"""Normalized record format produced by the detector pipeline."""
+from dataclasses import asdict, dataclass, field
+>>>>>>> integration/deploy-main
 from datetime import datetime, timezone
 from typing import Optional
 import uuid
@@ -14,6 +19,7 @@ import uuid
 
 @dataclass
 class Detection:
+<<<<<<< HEAD
     # Identity
     detection_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     timestamp: str = field(
@@ -41,6 +47,16 @@ class Detection:
     evidence: dict = field(default_factory=dict)
 
     # Link back to the source Wazuh alert for auditing/forensics
+=======
+    detection_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    agent_id: str = ""
+    agent_name: str = ""
+    host: str = ""
+    detection_type: str = ""
+    severity: str = "medium"
+    evidence: dict = field(default_factory=dict)
+>>>>>>> integration/deploy-main
     raw_alert_id: Optional[str] = None
     wazuh_rule_id: Optional[str] = None
     wazuh_rule_level: Optional[int] = None
