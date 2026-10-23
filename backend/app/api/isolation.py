@@ -41,6 +41,35 @@ asset_router = APIRouter(prefix="/api/assets", tags=["Isolation"], dependencies=
 internal_router = APIRouter(prefix="/api/internal/isolation", tags=["Internal Isolation Component"])
 isolation_component = require_component_scope(ComponentScope.ISOLATION_WRITE)
 
+
+@internal_router.get("/queue", dependencies=[Depends(isolation_component)])
+def list_approved_isolation_work(
+    db: Session = Depends(get_db),
+    _component: ComponentPrincipal = Depends(isolation_component),
+):
+    """List only approved or explicitly not-required isolation operations."""
+    return [
+        {
+            "isolation_action_id": action.id,
+            "action_request_id": action.action_request_id,
+            "operation": action.action_request.action_type,
+            "asset_id": action.asset_id,
+            "incident_id": action.incident_id,
+            "isolation_mode": action.isolation_mode,
+            "execution_status": action.execution_status,
+            "correlation_id": action.correlation_id,
+        }
+        for action in db.query(IsolationAction)
+        .join(ActionRequest, ActionRequest.id == IsolationAction.action_request_id)
+        .filter(
+            ActionRequest.approval_status.in_(("approved", "not_required")),
+            ActionRequest.execution_status == "not_started",
+            IsolationAction.execution_status.in_(("requested", "approved", "release_requested")),
+        )
+        .order_by(IsolationAction.requested_at.asc())
+        .all()
+    ]
+
 ACTIVE_INCIDENT_STATES = {"new", "triaged", "investigating", "contained", "recovery_in_progress"}
 TERMINAL_ISOLATION_STATUSES = {
     IsolationExecutionStatus.ISOLATED.value,

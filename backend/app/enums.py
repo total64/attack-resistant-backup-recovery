@@ -160,6 +160,7 @@ class CutoverStatus(StringEnum):
 
 
 class ActionType(StringEnum):
+    CREATE_BACKUP = "create_backup"
     PROTECT_BACKUP = "protect_backup"
     ISOLATE = "isolate"
     RELEASE_ISOLATION = "release_isolation"

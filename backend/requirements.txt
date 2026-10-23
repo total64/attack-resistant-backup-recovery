@@ -1,3 +1,10 @@
-fastapi
-uvicorn
+# Backend API and database
+fastapi>=0.100.0
+uvicorn[standard]>=0.22.0
 SQLAlchemy>=2.0,<3.0
+pydantic>=2.0,<3.0
+python-multipart>=0.0.6
+python-dotenv>=1.0.0
+
+# Teammate filesystem backup encryption utility; worker operations remain gated.
+cryptography>=41.0

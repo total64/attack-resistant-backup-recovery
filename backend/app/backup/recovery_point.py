@@ -22,7 +22,11 @@ class RecoveryPoint:
         status: str,
         file_count: int,
         size_bytes: int,
+<<<<<<< HEAD
     ):
+=======
+    ) -> "RecoveryPoint":
+>>>>>>> integration/deploy-main
         return cls(
             backup_id=backup_id,
             source_path=source_path,
@@ -43,4 +47,8 @@ class RecoveryPoint:
             "file_count": self.file_count,
             "size_bytes": self.size_bytes,
             "integrity_status": self.integrity_status,
+<<<<<<< HEAD
         }
+=======
+        }
+>>>>>>> integration/deploy-main
