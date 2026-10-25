@@ -211,7 +211,7 @@ export default function AdminPage() {
             You are currently signed in as <strong>{user?.display_name || user?.user_id || 'unauthenticated'}</strong> with role{' '}
             <span className="admin-badge admin-badge--viewer">{user?.role || 'none'}</span>. Administrative actions and user management require authorized administrator credentials.
           </p>
-          <Link to="/" className="admin-btn admin-btn--primary">
+          <Link to="/dashboard" className="admin-btn admin-btn--primary">
             Return to Operations Dashboard <ArrowRight size={13} />
           </Link>
         </div>
@@ -614,7 +614,7 @@ export default function AdminPage() {
               <h3 style={{ margin: 0, color: '#edf1f8', fontFamily: 'var(--mono)', fontSize: '12px' }}>
                 Recent Administrative Audit Events
               </h3>
-              <Link to="/audit-logs" className="admin-btn admin-btn--secondary">
+              <Link to="/dashboard/audit-logs" className="admin-btn admin-btn--secondary">
                 View Full Audit Log <ArrowRight size={12} />
               </Link>
             </div>

@@ -23,7 +23,7 @@ export default function LoginPage() {
     try {
       await login({ username: username.trim(), password })
       setPassword('')
-      navigate('/', { replace: true })
+      navigate('/dashboard', { replace: true })
     } catch (loginError) {
       setError(loginError.message || 'Unable to sign in. Check your connection and try again.')
     } finally {

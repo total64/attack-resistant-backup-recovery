@@ -42,17 +42,17 @@ export function Sidebar({ collapsed, onToggle, user, onLogout }) {
   const userLabel = user?.display_name || user?.user_id || 'Signed-in user'
   const initials = userLabel.split(/[\s_-]+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase() || 'AR'
   const paths = {
-    Dashboard: '/',
-    'Security Events': '/security-events',
-    'Threat Detection': '/threat-detection',
-    'Risk Analysis': '/risk-analysis',
-    Backups: '/backups',
-    Recovery: '/recovery',
-    'System Isolation': '/system-isolation',
-    'Audit Logs': '/audit-logs',
-    Settings: '/settings',
-    'Admin Panel': '/admin',
-    Profile: '/profile',
+    Dashboard: '/dashboard',
+    'Security Events': '/dashboard/security-events',
+    'Threat Detection': '/dashboard/threat-detection',
+    'Risk Analysis': '/dashboard/risk-analysis',
+    Backups: '/dashboard/backups',
+    Recovery: '/dashboard/recovery',
+    'System Isolation': '/dashboard/system-isolation',
+    'Audit Logs': '/dashboard/audit-logs',
+    Settings: '/dashboard/settings',
+    'Admin Panel': '/dashboard/admin',
+    Profile: '/dashboard/profile',
   }
   return (
     <aside className={`sidebar ${collapsed ? 'sidebar--collapsed' : ''}`}>
@@ -69,7 +69,7 @@ export function Sidebar({ collapsed, onToggle, user, onLogout }) {
           const path = paths[label]
           const contents = (active) => <><Icon size={14} strokeWidth={1.8} /><span>{label}</span>{active && <ChevronRight className="nav-chevron" size={12} />}</>
           return path
-            ? <NavLink className={({ isActive }) => `nav-link ${isActive ? 'nav-link--active' : ''}`} key={label} to={path} end={path === '/'} aria-label={label} title={label}>{({ isActive }) => contents(isActive)}</NavLink>
+            ? <NavLink className={({ isActive }) => `nav-link ${isActive ? 'nav-link--active' : ''}`} key={label} to={path} end aria-label={label} title={label}>{({ isActive }) => contents(isActive)}</NavLink>
             : <button className="nav-link" key={label} type="button" aria-label={label} title={label}>{contents(false)}</button>
         })}
       </nav>
@@ -80,7 +80,7 @@ export function Sidebar({ collapsed, onToggle, user, onLogout }) {
         </Link>
         <button className="logout-button" type="button" onClick={() => { if (window.confirm('Sign out of this account on this browser?')) onLogout() }} aria-label="Sign out" title="Sign out"><LogOut size={14} /></button>
       </div>
-      <Link className="sidebar-password-link" to="/profile">Profile &amp; password</Link>
+      <Link className="sidebar-password-link" to="/dashboard/profile">Profile &amp; password</Link>
     </aside>
   )
 }

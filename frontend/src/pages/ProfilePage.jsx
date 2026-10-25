@@ -85,7 +85,7 @@ export default function ProfilePage() {
           <div className="profile-card-content">
             <p className="profile-note">Changing your password requires the current password and signs out all active sessions after the API confirms the update.</p>
             <div className="profile-actions">
-              <Link className="toolbar-button profile-password-link" to="/change-password"><KeyRound size={15} /> Change password</Link>
+              <Link className="toolbar-button profile-password-link" to="/dashboard/change-password"><KeyRound size={15} /> Change password</Link>
             </div>
           </div>
         </section>

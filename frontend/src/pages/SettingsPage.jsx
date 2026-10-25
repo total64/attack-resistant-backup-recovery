@@ -24,16 +24,16 @@ import { useAuth } from '../auth/AuthContext.jsx'
 import './SettingsPage.css'
 
 const settingsPages = [
-  { path: '/settings/general', label: 'General', icon: 'settings', description: 'System identity and stored configuration metadata.' },
-  { path: '/settings/monitoring', label: 'Security Monitoring', icon: 'activity', description: 'Live service status and backend-reported monitoring coverage.' },
-  { path: '/settings/risk-engine', label: 'Risk Engine', icon: 'chart', description: 'Persisted risk bands used when new assessments are classified.' },
-  { path: '/settings/backup-integrity', label: 'Backup & Integrity', icon: 'database', description: 'Stored backup policy values; unsupported controls are not fabricated.' },
-  { path: '/settings/isolation', label: 'Isolation', icon: 'lock', description: 'Stored isolation policy values and enforced workflow safeguards.' },
-  { path: '/settings/recovery', label: 'Recovery', icon: 'rotate', description: 'Stored recovery policy and backend-enforced safety gates.' },
-  { path: '/settings/notifications', label: 'Notifications', icon: 'bell', description: 'Stored notification policy; delivery integrations are reported separately.' },
-  { path: '/settings/security-access', label: 'Security & Access', icon: 'shield', description: 'Current session and administrator-controlled operations accounts.' },
-  { path: '/settings/system-integrations', label: 'System & Integrations', icon: 'integrations', description: 'Live health endpoint and verifiable integration status.' },
-  { path: '/settings/audit-monitoring', label: 'Audit & Monitoring', icon: 'audit', description: 'Persisted audit activity and current system risk thresholds.' },
+  { path: '/dashboard/settings/general', label: 'General', icon: 'settings', description: 'System identity and stored configuration metadata.' },
+  { path: '/dashboard/settings/monitoring', label: 'Security Monitoring', icon: 'activity', description: 'Live service status and backend-reported monitoring coverage.' },
+  { path: '/dashboard/settings/risk-engine', label: 'Risk Engine', icon: 'chart', description: 'Persisted risk bands used when new assessments are classified.' },
+  { path: '/dashboard/settings/backup-integrity', label: 'Backup & Integrity', icon: 'database', description: 'Stored backup policy values; unsupported controls are not fabricated.' },
+  { path: '/dashboard/settings/isolation', label: 'Isolation', icon: 'lock', description: 'Stored isolation policy values and enforced workflow safeguards.' },
+  { path: '/dashboard/settings/recovery', label: 'Recovery', icon: 'rotate', description: 'Stored recovery policy and backend-enforced safety gates.' },
+  { path: '/dashboard/settings/notifications', label: 'Notifications', icon: 'bell', description: 'Stored notification policy; delivery integrations are reported separately.' },
+  { path: '/dashboard/settings/security-access', label: 'Security & Access', icon: 'shield', description: 'Current session and administrator-controlled operations accounts.' },
+  { path: '/dashboard/settings/system-integrations', label: 'System & Integrations', icon: 'integrations', description: 'Live health endpoint and verifiable integration status.' },
+  { path: '/dashboard/settings/audit-monitoring', label: 'Audit & Monitoring', icon: 'audit', description: 'Persisted audit activity and current system risk thresholds.' },
 ]
 
 const sectionIcons = {
@@ -328,7 +328,7 @@ export function SettingsLayout() {
         })}<div className="settings-nav-footer"><i className="status-dot status-dot--green" />Settings API protected · {user?.role || 'unknown role'}</div></nav>
         <section className="settings-content"><Outlet /></section>
       </div>
-      <section className="panel settings-danger-zone" aria-labelledby="settings-danger-title"><header><div><span className="eyebrow">Account controls</span><h2 id="settings-danger-title">Danger Zone</h2><p>Only supported account actions are offered here. Configuration and stored operational data are not deleted from this screen.</p></div><AlertTriangle size={16} /></header><div className="settings-danger-actions"><div><strong>Change Password</strong><span>Verify the current password; active sessions are revoked after update.</span><Link className="settings-danger-button" to="/change-password">Change password</Link></div><div><strong>End Current Session</strong><span>Revoke this browser session through the protected logout endpoint.</span><button className="settings-danger-button" type="button" onClick={signOut}>Sign out</button></div><div><strong>Account Recovery</strong><span>Operations accounts are created by an administrator; contact your system administrator if access is needed.</span><span className="settings-readonly-value">Administrator-managed</span></div></div>
+      <section className="panel settings-danger-zone" aria-labelledby="settings-danger-title"><header><div><span className="eyebrow">Account controls</span><h2 id="settings-danger-title">Danger Zone</h2><p>Only supported account actions are offered here. Configuration and stored operational data are not deleted from this screen.</p></div><AlertTriangle size={16} /></header><div className="settings-danger-actions"><div><strong>Change Password</strong><span>Verify the current password; active sessions are revoked after update.</span><Link className="settings-danger-button" to="/dashboard/change-password">Change password</Link></div><div><strong>End Current Session</strong><span>Revoke this browser session through the protected logout endpoint.</span><button className="settings-danger-button" type="button" onClick={signOut}>Sign out</button></div><div><strong>Account Recovery</strong><span>Operations accounts are created by an administrator; contact your system administrator if access is needed.</span><span className="settings-readonly-value">Administrator-managed</span></div></div>
       </section>
       <footer className="settings-page-footer"><span><i className="status-dot status-dot--green" />Settings values from authenticated backend APIs</span><span>Database-managed policies · role-controlled changes</span></footer>
     </main>
@@ -353,9 +353,9 @@ export function SettingsSecurityAccessPage() {
         <div className="settings-value-row"><dt>Permissions</dt><dd>{roleDescriptions[user?.role] || '—'}</dd></div>
       </dl>
       <p className="settings-readonly-note">Environment-managed identities remain provisioned through the protected server environment and are not modified by this form.</p>
-      <Link className="toolbar-button settings-password-link" to="/change-password"><KeyRound size={14} />Change password</Link>
+      <Link className="toolbar-button settings-password-link" to="/dashboard/change-password"><KeyRound size={14} />Change password</Link>
     </SettingsCard>
-    {user?.role === 'admin' ? <SettingsCard title="Administrator tools" description="User registry and account provisioning are available in the protected Admin Panel." icon={LockKeyhole}><div className="settings-readonly-explainer"><strong>Manage operations accounts</strong><p>Create viewer, analyst, and approver accounts, or inspect administrator-provisioned account details.</p></div><Link className="toolbar-button settings-password-link" to="/admin"><ShieldCheck size={14} />Open Admin Panel</Link></SettingsCard> : <SettingsCard title="Operations account access" description="This restricted system does not allow public self-registration." icon={LockKeyhole}><div className="settings-readonly-explainer"><strong>Administrator-managed access</strong><p>Contact an authorized system administrator to request an operations account. Viewers and operators cannot enumerate users or create accounts.</p></div></SettingsCard>}
+    {user?.role === 'admin' ? <SettingsCard title="Administrator tools" description="User registry and account provisioning are available in the protected Admin Panel." icon={LockKeyhole}><div className="settings-readonly-explainer"><strong>Manage operations accounts</strong><p>Create viewer, analyst, and approver accounts, or inspect administrator-provisioned account details.</p></div><Link className="toolbar-button settings-password-link" to="/dashboard/admin"><ShieldCheck size={14} />Open Admin Panel</Link></SettingsCard> : <SettingsCard title="Operations account access" description="This restricted system does not allow public self-registration." icon={LockKeyhole}><div className="settings-readonly-explainer"><strong>Administrator-managed access</strong><p>Contact an authorized system administrator to request an operations account. Viewers and operators cannot enumerate users or create accounts.</p></div></SettingsCard>}
   </div>
 }
 
@@ -378,10 +378,10 @@ export function SettingsAuditMonitoringPage() {
   const config = useApiResource('/settings', refresh)
   return <div className="settings-sections-grid">
     <SettingsCard title="Audit records" description="Record totals and actual outcomes returned by the audit API." icon={ClipboardList}>
-      <ApiState loading={audit.loading} error={audit.error} onRetry={() => setRefresh((value) => value + 1)}>{audit.data && <dl className="settings-values"><div className="settings-value-row"><dt>Matching records</dt><dd>{audit.data.total}</dd></div><div className="settings-value-row"><dt>Inspected records</dt><dd>{audit.data.items.length}</dd></div><div className="settings-value-row"><dt>Rejected outcomes in loaded page</dt><dd>{audit.data.items.filter((event) => event.result_status === 'rejected').length}</dd></div></dl>}</ApiState><Link className="toolbar-button settings-password-link" to="/audit-logs">View audit log</Link>
+      <ApiState loading={audit.loading} error={audit.error} onRetry={() => setRefresh((value) => value + 1)}>{audit.data && <dl className="settings-values"><div className="settings-value-row"><dt>Matching records</dt><dd>{audit.data.total}</dd></div><div className="settings-value-row"><dt>Inspected records</dt><dd>{audit.data.items.length}</dd></div><div className="settings-value-row"><dt>Rejected outcomes in loaded page</dt><dd>{audit.data.items.filter((event) => event.result_status === 'rejected').length}</dd></div></dl>}</ApiState><Link className="toolbar-button settings-password-link" to="/dashboard/audit-logs">View audit log</Link>
     </SettingsCard>
     <SettingsCard title="Risk thresholds" description="Active thresholds used for future risk classification." icon={ChartNoAxesCombined}>
-      <ApiState loading={config.loading} error={config.error} onRetry={() => setRefresh((value) => value + 1)}>{config.data && <SettingsValues values={config.data.risk_thresholds} />}</ApiState><Link className="toolbar-button settings-password-link" to="/settings/risk-engine">Configure risk bands</Link>
+      <ApiState loading={config.loading} error={config.error} onRetry={() => setRefresh((value) => value + 1)}>{config.data && <SettingsValues values={config.data.risk_thresholds} />}</ApiState><Link className="toolbar-button settings-password-link" to="/dashboard/settings/risk-engine">Configure risk bands</Link>
     </SettingsCard>
   </div>
 }
