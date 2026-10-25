@@ -1,57 +1,115 @@
-# 🛡️ ARBR — Attack-Resistant Backup and Recovery System
+# ARBR: Attack-Resistant Backup and Recovery System
 
-**🔐 Detect the Threat. Protect the Backup. Recover with Confidence.**
+**Detect the Threat. Protect the Backup. Recover with Confidence.**
 
-🔗 **Project Repository:** [ARBR on GitHub](https://github.com/total64/attack-resistant-backup-recovery)
+ARBR is a cybersecurity system designed to help organizations detect suspicious file activity, analyze risks, protect backup data, and support controlled recovery from ransomware and other destructive cyberattacks.
 
-🌐 **Live :** **[Open ARBR](https://arbr.onrender.com/)**
+**[Live Dashboard](https://arbr.onrender.com/) | [GitHub Repository](https://github.com/total64/attack-resistant-backup-recovery)**
 
-## 🎯 About the Project
+---
 
-ARBR is a cybersecurity system designed to help organizations detect suspicious file activity, analyze threats, protect backup data, and support safe recovery from ransomware and other destructive cyberattacks.
+## Overview
 
-## 💡 Why We Chose This Project
+Ransomware can encrypt or destroy important files and target backup systems, making recovery difficult. ARBR explores how threat detection, risk analysis, backup integrity verification, isolation, and recovery can work together to reduce the risk of permanent data loss.
 
-Ransomware can encrypt or destroy important files and target backup systems. ARBR explores how threat detection, backup protection, and verified recovery can work together to reduce the risk of permanent data loss.
+The project brings these defensive capabilities into a unified workflow, helping users monitor security events and manage backup and recovery operations.
 
-## 🚀 Main Features
+## Key Features
 
--  **Security Dashboard** — Monitor security activity and system status.
--  **Threat Detection** — Identify potential threats using security telemetry.
--  **Risk Analysis** — Assess and prioritize threats.
--  **Backup Management** — Review backup records and status.
--  **System Isolation** — Support authorized containment of affected systems.
--  **Integrity Verification** — Check backup integrity before recovery.
--  **Recovery Management** — Support controlled recovery workflows.
--  **Audit Logs** — Track security events and operation results.
--  **Authentication** — Control access according to user permissions.
+- **Threat Detection:** Collect and process security alerts from integrated monitoring tools.
+- **Risk Analysis:** Evaluate potential threats and help prioritize security events.
+- **Backup Management:** Track backup operations and their status.
+- **System Isolation:** Support containment of affected systems through configured controls.
+- **Integrity Verification:** Check backup integrity before recovery.
+- **Recovery Management:** Support controlled recovery workflows.
+- **Audit Logging:** Record security events and operation results.
+- **Access Control:** Restrict sensitive operations according to configured permissions.
 
-## ⚙️ How It Works
+## System Workflow
 
-📡 **Monitor** → 🔎 **Detect** → ⚠️ **Analyze Risk** → 💾 **Protect Backup** → 🔒 **Isolate** → ✅ **Verify** → ♻️ **Recover** → 📋 **Report**
+```text
+Security Monitoring
+        |
+        v
+Threat Detection
+        |
+        v
+Risk Analysis
+        |
+        v
+Backup Protection
+        |
+        v
+System Isolation
+        |
+        v
+Integrity Verification
+        |
+        v
+Controlled Recovery
+        |
+        v
+Audit and Reporting
+```
 
-## 🧑‍💻 How to Use
+The workflow supports a structured response to suspicious activity. Actual actions depend on the system configuration, available integrations, and required authorization.
 
-1. Sign in with an authorized account.
-2. Review the dashboard and security events.
-3. Investigate threats and assess their risk.
-4. Check backup status and verification results.
-5. Follow the required approvals for sensitive operations.
-6. Monitor recovery results and review audit logs.
+## Technology Stack
 
-## 🛠️ Requirements
+| Component | Technology |
+|---|---|
+| Frontend | React, Vite |
+| Backend | Python, FastAPI |
+| Security Monitoring | Wazuh |
+| System Operations | Linux, SSH, backup and recovery utilities |
+| Security Functions | Risk analysis, integrity verification, isolation, and recovery |
 
-🖥️ **Wazuh Server is required** for security monitoring and alert collection. Configure Wazuh and its agents, then integrate the collected alerts with the ARBR detector and backend.
+## Requirements
 
-## 🧰 Technology Stack
+A complete deployment may require:
 
--  React and Vite
--  FastAPI and Python
--  Wazuh
--  Backup, integrity verification, isolation, and recovery components
+- Python and the project's backend dependencies
+- Node.js and npm
+- A supported Linux environment for system-level operations
+- A configured Wazuh server and agents for security monitoring
+- Appropriate environment variables, permissions, and service configurations
 
-## 🎯 Project Goal
+Refer to the project's dependency files and configuration for the exact versions and setup requirements.
 
-To demonstrate how integrated threat detection, backup protection, and verified recovery can help organizations strengthen their resilience against ransomware.
+## Getting Started
 
-**🔐 ARBR — Protecting Data. Strengthening Recovery.**
+Clone the repository:
+
+```bash
+git clone https://github.com/total64/attack-resistant-backup-recovery.git
+cd attack-resistant-backup-recovery
+```
+
+Install the backend and frontend dependencies according to the project's configuration. Configure the required environment variables and services before starting the application.
+
+For complete setup instructions, use the dependency files and configuration included in the repository.
+
+## Testing
+
+The project includes tests for important backend functionality, including risk analysis, integrity verification, and recovery-related operations.
+
+Run the tests using the project's configured Python environment and test instructions.
+
+## Security Considerations
+
+- Restrict access to sensitive operations.
+- Verify backup integrity before recovery.
+- Configure isolation and recovery permissions carefully.
+- Protect credentials, API tokens, and environment files.
+- Test recovery procedures in an authorized environment.
+- Regularly verify that backups can be restored successfully.
+
+## Project Goal
+
+ARBR demonstrates how threat detection, risk-based decisions, backup protection, and verified recovery can work together to improve resilience against ransomware and other destructive cyberattacks.
+
+---
+
+**ARBR | Protecting Data. Strengthening Recovery.**
+
+[Live Dashboard](https://arbr.onrender.com/) · [Source Code](https://github.com/total64/attack-resistant-backup-recovery)
