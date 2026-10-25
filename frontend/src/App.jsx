@@ -58,7 +58,8 @@ function DashboardLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [globalSearch, setGlobalSearch] = useState('')
-  const pageTitle = {
+  const pageTitles = {
+    '/': 'Home',
     '/dashboard': 'Dashboard',
     '/dashboard/security-events': 'Security Events',
     '/dashboard/threat-detection': 'Threat Detection',
@@ -81,7 +82,8 @@ function DashboardLayout() {
     '/dashboard/admin': 'Admin Panel',
     '/dashboard/profile': 'Profile',
     '/dashboard/change-password': 'Change Password',
-  }[location.pathname] || 'Dashboard'
+  }
+  const pageTitle = pageTitles[location.pathname] || 'Dashboard'
 
   return (
     <div className="app-shell">
@@ -99,24 +101,44 @@ function PageContent({ component: PageComponent }) {
   return <PageComponent globalSearch={globalSearch} onGlobalSearchChange={setGlobalSearch} />
 }
 
+function LegacySettingsRedirect() {
+  const location = useLocation()
+  return <Navigate to={`/dashboard${location.pathname}`} replace />
+}
+
 function App() {
   return (
     <Routes>
       <Route path="/" element={<RootRoute />} />
       <Route path="/login" element={<LoginGate />} />
       <Route path="/register" element={<RegistrationPage />} />
+
+      {/* Keep legacy URLs working while the dashboard lives under /dashboard. */}
+      <Route path="/security-events" element={<Navigate to="/dashboard/security-events" replace />} />
+      <Route path="/threat-detection" element={<Navigate to="/dashboard/threat-detection" replace />} />
+      <Route path="/risk-analysis" element={<Navigate to="/dashboard/risk-analysis" replace />} />
+      <Route path="/backups" element={<Navigate to="/dashboard/backups" replace />} />
+      <Route path="/system-isolation" element={<Navigate to="/dashboard/system-isolation" replace />} />
+      <Route path="/recovery" element={<Navigate to="/dashboard/recovery" replace />} />
+      <Route path="/audit-logs" element={<Navigate to="/dashboard/audit-logs" replace />} />
+      <Route path="/admin" element={<Navigate to="/dashboard/admin" replace />} />
+      <Route path="/profile" element={<Navigate to="/dashboard/profile" replace />} />
+      <Route path="/change-password" element={<Navigate to="/dashboard/change-password" replace />} />
+      <Route path="/settings" element={<Navigate to="/dashboard/settings" replace />} />
+      <Route path="/settings/*" element={<LegacySettingsRedirect />} />
+
       <Route element={<RequireAuth />}>
-        <Route element={<DashboardLayout />}>
-          <Route path="dashboard" element={<PageContent component={DashboardPage} />} />
-          <Route path="dashboard/security-events" element={<PageContent component={SecurityEventsPage} />} />
-          <Route path="dashboard/threat-detection" element={<PageContent component={ThreatDetectionPage} />} />
-          <Route path="dashboard/risk-analysis" element={<PageContent component={RiskAnalysisPage} />} />
-          <Route path="dashboard/backups" element={<PageContent component={BackupsPage} />} />
-          <Route path="dashboard/system-isolation" element={<PageContent component={SystemIsolationPage} />} />
-          <Route path="dashboard/recovery" element={<PageContent component={RecoveryPage} />} />
-          <Route path="dashboard/audit-logs" element={<PageContent component={AuditLogsPage} />} />
-          <Route path="dashboard/admin" element={<AdminPage />} />
-          <Route path="dashboard/settings" element={<SettingsLayout />}>
+        <Route path="/dashboard" element={<DashboardLayout />}>
+          <Route index element={<PageContent component={DashboardPage} />} />
+          <Route path="security-events" element={<PageContent component={SecurityEventsPage} />} />
+          <Route path="threat-detection" element={<PageContent component={ThreatDetectionPage} />} />
+          <Route path="risk-analysis" element={<PageContent component={RiskAnalysisPage} />} />
+          <Route path="backups" element={<PageContent component={BackupsPage} />} />
+          <Route path="system-isolation" element={<PageContent component={SystemIsolationPage} />} />
+          <Route path="recovery" element={<PageContent component={RecoveryPage} />} />
+          <Route path="audit-logs" element={<PageContent component={AuditLogsPage} />} />
+          <Route path="admin" element={<AdminPage />} />
+          <Route path="settings" element={<SettingsLayout />}>
             <Route index element={<Navigate to="general" replace />} />
             <Route path="general" element={<SettingsGeneralPage />} />
             <Route path="monitoring" element={<SettingsMonitoringPage />} />
@@ -129,13 +151,13 @@ function App() {
             <Route path="system-integrations" element={<SettingsSystemIntegrationsPage />} />
             <Route path="audit-monitoring" element={<SettingsAuditMonitoringPage />} />
           </Route>
-          <Route path="dashboard/profile" element={<PageContent component={ProfilePage} />} />
-          <Route path="dashboard/change-password" element={<ChangePasswordPage />} />
+          <Route path="profile" element={<PageContent component={ProfilePage} />} />
+          <Route path="change-password" element={<ChangePasswordPage />} />
         </Route>
       </Route>
+
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
 }
-
 export default App

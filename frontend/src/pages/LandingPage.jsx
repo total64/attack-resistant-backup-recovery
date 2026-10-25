@@ -6,7 +6,6 @@ import {
   Database,
   Lock,
   Menu,
-  
   RotateCcw,
   Shield,
   ShieldCheck,

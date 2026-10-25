@@ -40,7 +40,7 @@ export default function RegistrationPage() {
       </main>
     )
   }
-  if (user) return <Navigate to="/" replace />
+  if (user) return <Navigate to="/dashboard" replace />
 
   const validate = () => {
     const trimmedUsername = username.trim()

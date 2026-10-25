@@ -560,7 +560,7 @@ tbody tr:hover { background: #292d36; }
   color: var(--control-text);
   background-color: transparent;
 }
-.app-shell :is(.event-filter-bar, .threat-filter-bar, .audit-filter-bar, .event-pagination, .pagination-controls) { background-color: var(--bg-panel-2); }
+.app-shell :is(.event-filter-bar, .threat-filter-bar, .audit-filter-bar, .risk-filter-bar, .event-pagination, .pagination-controls) { background-color: var(--bg-panel-2); }
 .app-shell :is(thead, th) { background-color: var(--bg-panel-2); }
 .app-shell input[type="checkbox"], .app-shell input[type="radio"] { accent-color: var(--cyan); }
 .app-shell :is(.toolbar-button, .row-action, .event-clear-button, .event-pagination button, .recovery-start-row, .isolation-row-action, .backup-verify-row) {
@@ -801,7 +801,7 @@ tbody tr:hover { background: #292d36; }
 }
 .app-shell :is(.event-summary-support, .threat-summary-support, .risk-summary-support, .backup-summary-support, .isolation-summary-support, .recovery-summary-support, .audit-summary-support) { font-size: 7px; line-height: 1.35; }
 .app-shell .event-filter-bar,
-.app-shell :is(.threat-filter-bar, .audit-filter-bar, .event-pagination, .pagination-controls) { background-color: #20242d; }
+.app-shell :is(.threat-filter-bar, .audit-filter-bar, .risk-filter-bar, .event-pagination, .pagination-controls) { background-color: #20242d; }
 .app-shell :is(thead, th) { background-color: #22252c; }
 .app-shell .settings-card-icon, .app-shell .profile-info-icon { border-radius: 2px; }
 .app-shell .settings-card-content > .settings-value-row { padding-block: 7px; }

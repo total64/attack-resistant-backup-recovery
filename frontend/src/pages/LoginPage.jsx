@@ -14,7 +14,7 @@ export default function LoginPage() {
   const [busy, setBusy] = useState(false)
 
   if (status === 'loading') return <main className="auth-loading" role="status"><span className="loading-spinner" />Verifying secure session…</main>
-  if (user) return <Navigate to="/" replace />
+  if (user) return <Navigate to="/dashboard" replace />
 
   const submit = async (event) => {
     event.preventDefault()
