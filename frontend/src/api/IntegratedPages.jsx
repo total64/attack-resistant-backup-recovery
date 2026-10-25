@@ -276,19 +276,46 @@ export function ThreatDetectionPage({ globalSearch, onGlobalSearchChange }) {
   </main>
 }
 
-export function RiskAnalysisPage({ globalSearch = '' }) {
-  const { data, loading, error } = useApiResource('/risk-assessments?page=1&page_size=100')
+function riskLevelTone(level) {
+  const value = String(level || '').toLowerCase()
+  if (value === 'critical' || value === 'high') return 'red'
+  if (value === 'medium') return 'amber'
+  if (value === 'low' || value === 'info') return 'green'
+  return 'cyan'
+}
+
+export function RiskAnalysisPage({ globalSearch = '', onGlobalSearchChange }) {
+  const [refresh, setRefresh] = useState(0)
+  const { data, loading, error } = useApiResource('/risk-assessments?page=1&page_size=100', refresh)
   const rows = data?.items || []
   const visible = rows.filter((row) => !globalSearch.trim() || [row.id, row.incident_id, row.asset_id, row.score, row.risk_level, row.status, row.factors, row.correlation_id].some((value) => String(value || '').toLowerCase().includes(globalSearch.trim().toLowerCase())))
   const latest = rows[0]
   const history = [...rows].reverse().map((row) => ({ time: formatTimestamp(row.assessed_at), score: row.score }))
   const assets = [...new Set(rows.map((row) => row.asset_id))]
+  const retry = () => setRefresh((value) => value + 1)
   return <main className="risk-analysis-main"><PageHeading title="Risk Analysis" description="Risk assessments and contributing factors as actually returned by the API." />
-    <section className="risk-summary-grid"><article className="risk-summary-card"><div className="risk-summary-copy"><span className="eyebrow">Latest Risk Score</span><strong>{latest ? `${latest.score} / 100` : 'No records'}</strong><span>{latest?.risk_level || 'No assessments returned'}</span></div></article><article className="risk-summary-card"><div className="risk-summary-copy"><span className="eyebrow">Assessments</span><strong>{data?.total ?? '—'}</strong><span>Total returned by API</span></div></article><article className="risk-summary-card"><div className="risk-summary-copy"><span className="eyebrow">Latest Assessment</span><strong>{latest ? formatTimestamp(latest.assessed_at) : 'No records'}</strong><span>Backend assessment timestamp</span></div></article><article className="risk-summary-card"><div className="risk-summary-copy"><span className="eyebrow">Assets Represented</span><strong>{assets.length || '—'}</strong><span>In the loaded assessment page only</span></div></article></section>
-    <div className="risk-overview-grid"><section className="panel risk-score-panel"><header className="risk-section-heading"><div><h2>Latest Risk Assessment</h2><p>One backend assessment; no aggregate score is inferred.</p></div>{latest && <span className={`severity severity--${statusClass(latest.risk_level)}`}>{latest.risk_level}</span>}</header><div className="api-risk-latest">{latest ? <><strong>{latest.score}</strong><span>/ 100 · assessment {latest.id}</span><dl className="event-detail-grid"><ApiDetail label="Incident ID" value={latest.incident_id} /><ApiDetail label="Asset ID" value={latest.asset_id} /><ApiDetail label="Confidence" value={latest.confidence} /><ApiDetail label="Status" value={latest.status} /><ApiDetail label="Model version" value={latest.model_version} /><ApiDetail label="Policy version" value={latest.policy_version} /></dl></> : <div className="api-unavailable">No assessment records returned.</div>}</div></section>
-      <section className="panel risk-history-panel"><header className="risk-section-heading"><div><h2>Risk Assessment History</h2><p>Scores from the loaded API page, ordered by assessment time.</p></div></header>{history.length > 1 ? <div className="risk-history-chart"><ResponsiveContainer width="100%" height="100%"><LineChart data={history}><CartesianGrid vertical={false} stroke="#30343d" strokeDasharray="2 5" /><XAxis dataKey="time" /><YAxis domain={[0, 100]} /><Tooltip /><Line dataKey="score" stroke="#09c7d8" dot={false} /></LineChart></ResponsiveContainer></div> : <div className="api-unavailable">At least two assessments are required for a history chart.</div>}</section></div>
-    <section className="panel risk-table-panel"><header className="risk-section-heading"><div><h2>Risk Assessments</h2><p>Factors are displayed in the form supplied by the backend.</p></div></header><ApiState loading={loading} error={error} empty={!loading && !error && visible.length === 0 ? 'No risk assessments match the current search.' : null}>{visible.length > 0 && <ApiTable headings={['Assessment ID', 'Incident ID', 'Asset ID', 'Score', 'Risk Level', 'Status', 'Assessed At', 'Factors', 'Correlation ID']} className="risk-table-scroll">{visible.map((row) => <tr key={row.id}><td>{row.id}</td><td>{row.incident_id}</td><td>{row.asset_id}</td><td>{row.score}</td><td>{row.risk_level}</td><td>{row.status}</td><td>{formatTimestamp(row.assessed_at)}</td><td>{row.factors.length ? displayValue(row.factors) : 'None provided'}</td><td>{row.correlation_id}</td></tr>)}</ApiTable>}</ApiState></section>
-    <section className="panel recommended-response"><div><h2>Recommended Response</h2><p>Recommendations are not part of the RiskAssessment response schema.</p></div></section>
+    <ApiState loading={loading} error={error} onRetry={retry}>
+      {data && <>
+        <section className="risk-summary-grid" aria-label="Risk assessment summary">
+          {[
+            ['Latest Risk Score', latest ? `${latest.score} / 100` : 'No records', latest?.risk_level || 'No assessments returned', AlertTriangle, riskLevelTone(latest?.risk_level)],
+            ['Assessments', data.total ?? '—', 'Total returned by API', Activity, 'cyan'],
+            ['Latest Assessment', latest ? formatTimestamp(latest.assessed_at) : 'No records', 'Backend assessment timestamp', CalendarDays, 'amber'],
+            ['Assets Represented', assets.length || '—', 'In the loaded assessment page only', Database, 'green'],
+          ].map(([label, value, support, Icon, tone]) => <article className={`risk-summary-card risk-summary-card--${tone}`} key={label}><div className="risk-summary-copy"><span className="eyebrow">{label}</span><strong>{value}</strong><span className="risk-summary-support">{support}</span></div><div className="risk-summary-icon"><Icon size={17} strokeWidth={1.8} /></div></article>)}
+        </section>
+        <div className="risk-overview-grid">
+          <section className="panel risk-history-panel"><header className="risk-section-heading"><div><h2>Risk Assessment History</h2><p>Scores from the loaded API page, ordered by assessment time.</p></div><div className="chart-legend"><span><i className="legend-dot" />Score</span></div></header>{history.length > 1 ? <div className="risk-history-chart"><ResponsiveContainer width="100%" height="100%"><LineChart data={history} margin={{ top: 10, right: 8, bottom: 0, left: -12 }}><CartesianGrid vertical={false} stroke="#30343d" strokeDasharray="2 5" /><XAxis dataKey="time" axisLine={false} tickLine={false} tick={{ fill: '#9298a4', fontSize: 9, fontFamily: 'ui-monospace, monospace' }} dy={8} /><YAxis domain={[0, 100]} allowDecimals={false} axisLine={false} tickLine={false} tick={{ fill: '#9298a4', fontSize: 9, fontFamily: 'ui-monospace, monospace' }} /><Tooltip contentStyle={{ border: '1px solid #384253', borderRadius: 2, color: '#dce3ec', background: '#131e33', fontSize: 9 }} /><Line type="monotone" dataKey="score" name="Score" stroke="#09c7d8" strokeWidth={1.7} dot={false} activeDot={{ r: 3, fill: '#09c7d8', stroke: '#101a34', strokeWidth: 2 }} /></LineChart></ResponsiveContainer></div> : <div className="api-unavailable">At least two assessments are required for a history chart.</div>}</section>
+          <section className="panel risk-score-panel"><header className="risk-section-heading"><div><h2>Latest Risk Assessment</h2><p>One backend assessment; no aggregate score is inferred.</p></div>{latest && <span className={`severity severity--${statusClass(latest.risk_level)}`}>{latest.risk_level}</span>}</header><div className="api-risk-latest">{latest ? <><strong>{latest.score}</strong><span>/ 100 · assessment {latest.id}</span><dl className="event-detail-grid"><ApiDetail label="Incident ID" value={latest.incident_id} /><ApiDetail label="Asset ID" value={latest.asset_id} /><ApiDetail label="Confidence" value={latest.confidence} /><ApiDetail label="Status" value={latest.status} /><ApiDetail label="Model version" value={latest.model_version} /><ApiDetail label="Policy version" value={latest.policy_version} /></dl></> : <div className="api-unavailable">No assessment records returned.</div>}</div></section>
+        </div>
+        <section className="panel risk-table-panel"><header className="risk-section-heading"><div><h2>Risk Assessments</h2><p>Factors are displayed in the form supplied by the backend.</p></div></header>
+          <div className="risk-filter-bar"><label className="event-search"><span className="sr-only">Search</span><input type="search" value={globalSearch || ''} onChange={(event) => onGlobalSearchChange?.(event.target.value)} placeholder="Search returned fields" /></label></div>
+          <ApiState empty={visible.length === 0 ? 'No risk assessments match the current search.' : null}>{visible.length > 0 && <ApiTable headings={['Assessment ID', 'Incident ID', 'Asset ID', 'Score', 'Risk Level', 'Status', 'Assessed At', 'Factors', 'Correlation ID']} className="risk-table-scroll">{visible.map((row) => <tr key={row.id}><td className="event-id">{row.id}</td><td>{row.incident_id}</td><td>{row.asset_id}</td><td>{row.score}</td><td><ValueBadge value={row.risk_level} className="severity" /></td><td>{row.status}</td><td>{formatTimestamp(row.assessed_at)}</td><td>{row.factors.length ? displayValue(row.factors) : 'None provided'}</td><td>{row.correlation_id}</td></tr>)}</ApiTable>}</ApiState>
+        </section>
+        <section className="panel recommended-response"><header className="risk-section-heading"><div><h2>Recommended Response</h2><p>Recommendations are not part of the RiskAssessment response schema.</p></div></header></section>
+      </>}
+    </ApiState>
+    <footer className="status-footer"><span>Risk scores and factors are taken from persisted backend assessments.</span></footer>
   </main>
 }
 
@@ -302,10 +329,9 @@ function BackupDetails({ backupId, onClose }) {
     Promise.all([
       api.get(`/backups/${encodeURIComponent(backupId)}`, { signal: controller.signal }),
       api.get(`/backups/${encodeURIComponent(backupId)}/recovery-eligibility`, { signal: controller.signal }),
-      api.get(`/integrity-verifications?backup_id=${encodeURIComponent(backupId)}&page=1&page_size=100`, { signal: controller.signal }),
-    ]).then(async ([backup, eligibility, verificationHistory]) => {
+    ]).then(async ([backup, eligibility]) => {
       const points = await api.get(`/assets/${encodeURIComponent(backup.asset_id)}/recovery-points?page=1&page_size=20`, { signal: controller.signal })
-      setState({ requestKey, data: { backup, eligibility, points, verificationHistory }, loading: false, error: null })
+      setState({ requestKey, data: { backup, eligibility, points }, loading: false, error: null })
     }).catch((error) => { if (error.name !== 'AbortError') setState({ requestKey, data: null, loading: false, error }) })
     return () => controller.abort()
   }, [backupId, refresh, requestKey])
@@ -313,8 +339,7 @@ function BackupDetails({ backupId, onClose }) {
   const data = currentState.data
   return <div className="event-drawer-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}><aside className="event-details-drawer" role="dialog" aria-modal="true" aria-labelledby="backup-details-title"><header className="event-drawer-header"><div><span className="eyebrow">Backend recovery point</span><h2 id="backup-details-title">Backup Details</h2></div><button className="icon-button" onClick={onClose} aria-label="Close details">×</button></header>
     <ApiState loading={currentState.loading} error={currentState.error} onRetry={() => setRefresh((value) => value + 1)}>{data && <><section className="detail-section"><dl className="event-detail-grid"><ApiDetail label="Backup ID" value={data.backup.backup_id} /><ApiDetail label="Asset ID" value={data.backup.asset_id} /><ApiDetail label="External backup ID" value={data.backup.external_backup_id} /><ApiDetail label="Created by component" value={data.backup.created_by_component} /><ApiDetail label="Created at" value={formatTimestamp(data.backup.created_at)} /><ApiDetail label="Backup type" value={data.backup.backup_type} /><ApiDetail label="Size" value={formatBytes(data.backup.size_bytes)} /><ApiDetail label="Lifecycle status" value={data.backup.lifecycle_status} /><ApiDetail label="Protection status" value={data.backup.protection_status} /><ApiDetail label="Encryption status" value={data.backup.encryption_status} /><ApiDetail label="Verified" value={data.backup.verified} /><ApiDetail label="Recovery eligible" value={data.eligibility.eligible} /><ApiDetail label="Eligibility reasons" value={data.eligibility.reasons} /><ApiDetail label="Correlation ID" value={data.backup.correlation_id} /></dl></section>
-      <section className="detail-section"><h3>Recovery points for asset</h3><p>{data.points.total} points returned; eligibility is backend-confirmed per record.</p>{data.points.items.map((point) => <p key={point.backup_id}>{point.backup_id} · eligible: {String(point.recovery_eligible)} · {point.eligibility_reasons.join(', ') || 'no reasons returned'}</p>)}</section>
-      <section className="detail-section"><h3>Integrity verification history</h3>{data.verificationHistory.items.length === 0 ? <p>No verification operations are recorded for this backup.</p> : data.verificationHistory.items.map((verification) => <p key={verification.verification_id}>{verification.result_status} · started {formatTimestamp(verification.started_at)} · completed {formatTimestamp(verification.completed_at)}{verification.failure_reason ? ` · ${verification.failure_reason}` : ''}</p>)}</section></>}</ApiState>
+      <section className="detail-section"><h3>Recovery points for asset</h3><p>{data.points.total} points returned; eligibility is backend-confirmed per record.</p>{data.points.items.map((point) => <p key={point.backup_id}>{point.backup_id} · eligible: {String(point.recovery_eligible)} · {point.eligibility_reasons.join(', ') || 'no reasons returned'}</p>)}</section></>}</ApiState>
   </aside></div>
 }
 
@@ -333,30 +358,12 @@ export function BackupsPage({ globalSearch = '' }) {
       setRefresh((value) => value + 1)
     } catch (requestError) { setActionState({ busy: false, error: requestError, message: '' }) }
   }
-  const requestBackupCreation = async (assetId) => {
-    setActionState({ busy: true, error: null, message: '' })
-    try {
-      const request = await api.post('/action-requests', {
-        action_type: 'create_backup',
-        asset_id: assetId,
-        request_reason: 'Backup creation requested from the frontend.',
-      })
-      setActionState({
-        busy: false,
-        error: null,
-        message: `Backup request recorded (${request.approval_status}/${request.execution_status}); approval and a scoped worker are required.`,
-      })
-      setRefresh((value) => value + 1)
-    } catch (requestError) {
-      setActionState({ busy: false, error: requestError, message: '' })
-    }
-  }
   const count = (predicate) => items.filter(predicate).length
   return <main className="backups-main"><PageHeading title="Backups" description="Backend backup metadata, verification state, and recovery eligibility." actions={<button className="toolbar-button" onClick={() => setRefresh((value) => value + 1)}>Refresh</button>} />
     <section className="backup-summary-grid"><article className="backup-summary-card"><div className="backup-summary-copy"><span className="eyebrow">Total Backups</span><strong>{data?.total ?? '—'}</strong><span>Backend total</span></div></article><article className="backup-summary-card"><div className="backup-summary-copy"><span className="eyebrow">Verified In Loaded Page</span><strong>{count((item) => item.verified)}</strong><span>Backend eligibility assessment</span></div></article><article className="backup-summary-card"><div className="backup-summary-copy"><span className="eyebrow">Recovery Eligible In Loaded Page</span><strong>{count((item) => item.recovery_eligible)}</strong><span>Backend-confirmed</span></div></article><article className="backup-summary-card"><div className="backup-summary-copy"><span className="eyebrow">Not Recovery Eligible · Loaded Page</span><strong>{count((item) => !item.recovery_eligible)}</strong><span>Backend eligibility assessment</span></div></article></section>
-    <ActionRequestApprovalPanel actionTypes={['create_backup', 'protect_backup', 'verify_backup']} refresh={refresh} onChanged={() => setRefresh((value) => value + 1)} />
+    <ActionRequestApprovalPanel actionTypes={['protect_backup']} refresh={refresh} onChanged={() => setRefresh((value) => value + 1)} />
     <section className="panel backup-repository-panel"><header className="backup-section-heading"><div><h2>Backup Repository</h2><p>Actual backend lifecycle, protection, verification, and eligibility fields.</p></div></header>{actionState.message && <p className="api-note" role="status">{actionState.message}</p>}{actionState.error && <ApiState error={actionState.error} />}
-      <ApiState loading={loading} error={error} onRetry={() => setRefresh((value) => value + 1)} empty={!loading && !error && filtered.length === 0 ? 'No backups match the current search.' : null}>{filtered.length > 0 && <ApiTable headings={['Backup ID', 'Asset ID', 'Type', 'Size', 'Created', 'Lifecycle', 'Protection', 'Verified', 'Recovery Eligible', 'Actions']} className="backup-table-scroll">{filtered.map((item) => <tr key={item.backup_id}><td className="backup-id">{item.backup_id}</td><td>{item.asset_id}</td><td>{displayValue(item.backup_type)}</td><td>{formatBytes(item.size_bytes)}</td><td>{formatTimestamp(item.created_at)}</td><td>{item.lifecycle_status}</td><td>{item.protection_status}</td><td>{String(item.verified)}</td><td>{String(item.recovery_eligible)}{item.eligibility_reasons.length > 0 && <small>{item.eligibility_reasons.join('; ')}</small>}</td><td><button className="row-action" onClick={() => setSelectedId(item.backup_id)}>Details</button> <button className="backup-verify-row" disabled={actionState.busy} onClick={() => requestVerification(item.backup_id)}>Request verification</button> <button className="backup-verify-row" disabled={actionState.busy} onClick={() => requestBackupCreation(item.asset_id)}>Request backup</button></td></tr>)}</ApiTable>}</ApiState>
+      <ApiState loading={loading} error={error} onRetry={() => setRefresh((value) => value + 1)} empty={!loading && !error && filtered.length === 0 ? 'No backups match the current search.' : null}>{filtered.length > 0 && <ApiTable headings={['Backup ID', 'Asset ID', 'Type', 'Size', 'Created', 'Lifecycle', 'Protection', 'Verified', 'Recovery Eligible', 'Actions']} className="backup-table-scroll">{filtered.map((item) => <tr key={item.backup_id}><td className="backup-id">{item.backup_id}</td><td>{item.asset_id}</td><td>{displayValue(item.backup_type)}</td><td>{formatBytes(item.size_bytes)}</td><td>{formatTimestamp(item.created_at)}</td><td>{item.lifecycle_status}</td><td>{item.protection_status}</td><td>{String(item.verified)}</td><td>{String(item.recovery_eligible)}{item.eligibility_reasons.length > 0 && <small>{item.eligibility_reasons.join('; ')}</small>}</td><td><button className="row-action" onClick={() => setSelectedId(item.backup_id)}>Details</button> <button className="backup-verify-row" disabled={actionState.busy} onClick={() => requestVerification(item.backup_id)}>Request verification</button></td></tr>)}</ApiTable>}</ApiState>
       <footer className="backup-table-footer">Showing {items.length} loaded of {data?.total ?? 0} backups. Verification is requested through the backend; only a component report can complete it.</footer>
     </section>
     {selectedId && <BackupDetails backupId={selectedId} onClose={() => setSelectedId(null)} />}
