@@ -1,55 +1,57 @@
-# Attack-Resistant Backup and Recovery System
+# 🛡️ ARBR — Attack-Resistant Backup and Recovery System
 
-## Development setup and integrated workflow
+**🔐 Detect the Threat. Protect the Backup. Recover with Confidence.**
 
-The current backend is under `backend/` and its authenticated React frontend is under `frontend/`. Use the project's `backend/venv` if present, install `backend/requirements-dev.txt`, then run the backend from `backend/` with `uvicorn app.main:app --reload`. The backend loads `backend/.env`; keep that private file and the frontend's local environment files out of version control. Run the Vite frontend from `frontend/` with `npm run dev`. The API's cookie-session and CSRF behavior remains in place.
+🔗 **Project Repository:** [ARBR on GitHub](https://github.com/total64/attack-resistant-backup-recovery)
 
-`pytest.ini` makes the backend package and project root visible when pytest is invoked from the repository root. Run `pytest -q` from the root, `npm run lint` and `npm run build` from `frontend/`.
+🌐 **Live :** **[Open ARBR](https://arbr.onrender.com/)**
 
-### Detector event path
+## 🎯 About the Project
 
-The detector implementation in `detector/` reads Wazuh alert JSONL, applies its file-integrity heuristics, converts detections to the backend `SecurityEventCreate` contract, and posts to `POST /api/internal/security-events` with `X-Internal-Component-Token`. Configure an existing asset reference and a component credential limited to `security_events:write`; delivery failures are retained locally without saving the credential. Ingestion now creates/resumes the persisted threat → configured risk-level assessment → decision proposal pipeline. Each stage is audited and has a correlation ID. Decisions do not execute actions or bypass analyst/approver roles.
+ARBR is a cybersecurity system designed to help organizations detect suspicious file activity, analyze threats, protect backup data, and support safe recovery from ransomware and other destructive cyberattacks.
 
-### Worker operations
+## 💡 Why We Chose This Project
 
-The downloaded backup, integrity, recovery and isolation worker primitives are available under `backend/app/backup`, `backend/app/recovery`, and `backend/app/isolation`. They are explicit utilities, not automatically invoked by the API. The API's existing ActionRequest approval, internal component scopes, claim/queue and component-result state machines remain authoritative. The backup helper creates a non-destructive rsync copy (no `--delete`) and computes a SHA-256 manifest; verification does not replace an existing trusted manifest. The protection/encryption helpers require explicit worker invocation and are not wired to run on ingestion. Recovery remains blocked without a passing recent verification, authorization and confirmed isolation. No live external services or host changes are performed in tests.
+Ransomware can encrypt or destroy important files and target backup systems. ARBR explores how threat detection, backup protection, and verified recovery can work together to reduce the risk of permanent data loss.
 
-See [README_DETECTION.md](README_DETECTION.md) for detector configuration and limits. Live Wazuh, SSH/firewall, backup worker, integrity worker, recovery worker, and production identity infrastructure must be deployed separately; the UI/backend do not claim those workers are online or report success before a validated component result.
+## 🚀 Main Features
 
-A cybersecurity system that protects an organization’s critical data from ransomware and other cyber threats by monitoring files and backups, detecting and analyzing suspicious activity, protecting and isolating data, and providing recovery options from verified, safe backups.
+-  **Security Dashboard** — Monitor security activity and system status.
+-  **Threat Detection** — Identify potential threats using security telemetry.
+-  **Risk Analysis** — Assess and prioritize threats.
+-  **Backup Management** — Review backup records and status.
+-  **System Isolation** — Support authorized containment of affected systems.
+-  **Integrity Verification** — Check backup integrity before recovery.
+-  **Recovery Management** — Support controlled recovery workflows.
+-  **Audit Logs** — Track security events and operation results.
+-  **Authentication** — Control access according to user permissions.
 
-## The Problem
+## ⚙️ How It Works
 
-Cybersecurity threats such as ransomware can target enterprise files and encryption keys, rendering data inaccessible through encryption or deletion. In addition, ransomware may target and destroy backup files, rendering data recovery unrecoverable.
+📡 **Monitor** → 🔎 **Detect** → ⚠️ **Analyze Risk** → 💾 **Protect Backup** → 🔒 **Isolate** → ✅ **Verify** → ♻️ **Recover** → 📋 **Report**
 
-Enterprises need an attack-resistant cybersecurity system that detects and analyzes ransomware and other malicious activity, protects backup data, isolates affected systems, and restores files from protected, verified backups.
+## 🧑‍💻 How to Use
 
-## Project Goal
-The goal of this project is to design a system that
-1. Detects ransomware and other file-encrypting malware through behavioral analysis of file access and modification patterns,
-2. Protects enterprise files and backups through isolation and tamper-protection mechanisms,
+1. Sign in with an authorized account.
+2. Review the dashboard and security events.
+3. Investigate threats and assess their risk.
+4. Check backup status and verification results.
+5. Follow the required approvals for sensitive operations.
+6. Monitor recovery results and review audit logs.
 
-3. Analyzes and prioritizes security threats based on risk values,
-4. Verifies the integrity of backup data to be used for enterprise file recovery,
-5. Recovers files from safely isolated, unaltered data backups in response to detected ransomware attacks, and
-6. Records relevant events for auditing and forensics.
-The proposed solution addresses ransomware and cybersecurity threats by monitoring, detecting, analyzing, protecting, isolating, verifying, and recovering data according to the automated procedure in Figure 1 below:
-```
-Figure 1: Cybersecurity and Data Recovery Procedure
+## 🛠️ Requirements
 
-Monitor
-↓
-Detect
-↓
-Analyze Risk
-↓
-Protect Backup
-↓
-Isolate
-↓
-Verify Backup
-↓
-Recover
-↓
-Report
-```
+🖥️ **Wazuh Server is required** for security monitoring and alert collection. Configure Wazuh and its agents, then integrate the collected alerts with the ARBR detector and backend.
+
+## 🧰 Technology Stack
+
+-  React and Vite
+-  FastAPI and Python
+-  Wazuh
+-  Backup, integrity verification, isolation, and recovery components
+
+## 🎯 Project Goal
+
+To demonstrate how integrated threat detection, backup protection, and verified recovery can help organizations strengthen their resilience against ransomware.
+
+**🔐 ARBR — Protecting Data. Strengthening Recovery.**
