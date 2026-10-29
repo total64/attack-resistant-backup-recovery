@@ -25,6 +25,25 @@ The project brings these defensive capabilities into a unified workflow, helping
 - **Audit Logging:** Record security events and operation results.
 - **Access Control:** Restrict sensitive operations according to configured permissions.
 
+----
+# Our Team
+
+Meet the people behind this project.
+
+| No. | Name | CTC ID | GitHub |
+|---:|---|---|---|
+| 1 | Naboni Abrham | CTC-459-26 | [@naboni-git](https://github.com/naboni-git) |
+| 2 | Lameik Equar | CTC-3115-26 | [@captlameik](https://github.com/captlameik) |
+| 3 | Befikir Shimelis | CTC-674-26 | [@squidward404](https://github.com/squidward404) |
+| 4 | Eden Mulugeta | CTC-4135-26 | [@girlcode-eden](https://github.com/girlcode-eden) |
+| 5 | Abenezer Tekalign | CTC-7212-26 | [@Abeni118](https://github.com/Abeni118) |
+| 6 | Naaol Raffisaa | CTC-1138-26 | [@total64](https://github.com/total64) |
+
+---
+
+*Built with collaboration, creativity, and a shared passion for technology.*
+
+
 ## System Workflow
 
 ```text
